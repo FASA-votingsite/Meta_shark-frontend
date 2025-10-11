@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
+//import axios from 'axios';
 import '../styles/Auth.css';
 
 const Signup = ({ onLogin }) => {
@@ -55,16 +55,17 @@ const Signup = ({ onLogin }) => {
     }
   ];
 
+  
   useEffect(() => {
     fetchPackages();
   }, []);
 
-  const fetchPackages = async () => {
+  const fetchPackages = useCallback(async () => {
     try {
       setPackagesLoading(true);
       // Try to fetch from API first
-      const response = await axios.get('/api/packages/');
-      setPackages(response.data);
+      //const response = await axios.get('/api/packages/');
+      setPackages(mockPackages);
     } catch (error) {
       console.error('Error fetching packages, using mock data:', error);
       // Use mock data if API fails
@@ -72,7 +73,7 @@ const Signup = ({ onLogin }) => {
     } finally {
       setPackagesLoading(false);
     }
-  };
+  });
 
   const handleChange = (e) => {
     setFormData({

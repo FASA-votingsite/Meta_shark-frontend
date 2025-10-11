@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "18"
+  CI = false
+
+[context.production.environment]
+  REACT_APP_API_URL = "https://your-backend-url.herokuapp.com"
