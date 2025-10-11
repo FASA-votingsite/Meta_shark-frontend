@@ -1,0 +1,49 @@
+/* src/components/PackageBadge.css */
+.package-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.package-badge i {
+    font-size: 10px;
+}
+
+.package-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Pro Package Styling */
+.package-badge.pro {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    border: 1px solid #FFA500;
+}
+
+.package-badge.silver {
+    background: linear-gradient(135deg, #C0C0C0, #A0A0A0);
+    border: 1px solid #A0A0A0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .package-badge {
+        font-size: 10px;
+        padding: 3px 8px;
+        margin-left: 5px;
+    }
+    
+    .package-badge i {
+        font-size: 8px;
+    }
+}

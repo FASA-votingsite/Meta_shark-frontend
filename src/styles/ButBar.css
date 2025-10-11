@@ -1,0 +1,86 @@
+/* styles/Navbar.css */
+.butbar {
+  background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  bottom: 0;
+  z-index: 1000;
+  max-width: 1200px;
+}
+
+.butbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.butbar-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.butbar-logo img {
+  height: 40px;
+  margin-right: 10px;
+}
+
+.butbar-logo span {
+  font-size: 24px;
+  font-weight: 700;
+  color: #3498db;
+}
+
+.butbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  align-self: center;
+  align-content: center;
+}
+
+.butbar-item {
+  color: #2c3e50;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.butbar-item:hover {
+  color: #3498db;
+}
+
+
+.logout-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.logout-btn:hover {
+  background: #c0392b;
+}
+
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .butbar-container {
+    flex-direction: column;
+    padding: 10px;
+  }
+  
+  .butbar-menu {
+    margin-top: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+  }
+
+}
