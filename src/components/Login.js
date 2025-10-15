@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { authAPI } from '../services/authService';
 import '../styles/Auth.css';
 
 const Login = ({ onLogin }) => {
@@ -9,18 +9,6 @@ const Login = ({ onLogin }) => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Mock data for temporary login - will work with ANY username/password
-  const MOCK_USER = {
-    id: 1,
-    username: 'demo_user',
-    email: 'demo@metashark.com',
-    wallet_balance: 150.75,
-    referral_code: 'META123',
-    total_earnings: 325.50
-  };
-
-  const MOCK_TOKEN = 'mock_jwt_token_12345';
 
   const handleChange = (e) => {
     setFormData({
@@ -34,37 +22,15 @@ const Login = ({ onLogin }) => {
     setLoading(true);
     setError('');
 
-    // Always use mock data for now - will work with any input
-    const USE_MOCK_DATA = true;
-
-    if (USE_MOCK_DATA) {
-      // Use the entered username or default to 'demo_user'
-      const userToLogin = {
-        ...MOCK_USER,
-        username: formData.username || 'demo_user',
-        email: formData.username.includes('@') ? formData.username : 'demo@metashark.com'
-      };
-      
-      // Simulate API call delay
-      setTimeout(() => {
-        onLogin(MOCK_TOKEN, userToLogin);
-        setLoading(false);
-      }, 1000);
+    try {
+      const response = await authAPI.login(formData.username, formData.password);
+      onLogin(response.token, response.user);
+    } catch (error) {
+      setError(error.message || 'Login failed. Please check your credentials and try again.');
+    } finally {
+      setLoading(false);
     }
-    
-    /*else {
-      try {
-        // Real API call (commented out for now)
-        const response = await axios.post('/api/auth/login/', formData);
-        const { token, user } = response.data;
-        onLogin(token, user);
-      } catch (error) {
-        setError(error.response?.data?.error || 'Login failed. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    } */
-  }; 
+  };
 
   return (
     <div className="auth-container">
@@ -72,22 +38,19 @@ const Login = ({ onLogin }) => {
         <div className="auth-header">
           <h2>Login to META_SHARK</h2>
           <p>Access your content monetization account</p>
-          <p style={{color: '#3498db', fontSize: '14px', marginTop: '10px'}}>
-            Demo mode: Use any username/password
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
           {error && <div className="auth-error">{error}</div>}
           
           <div className="form-group">
-            <label>Username or Email</label>
+            <label>WhatsApp Number or Username</label>
             <input
               type="text"
               name="username"
               value={formData.username}
               onChange={handleChange}
-              placeholder="Enter any value for demo"
+              placeholder="Enter WhatsApp number or username"
               required
             />
           </div>
@@ -99,7 +62,7 @@ const Login = ({ onLogin }) => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="Enter any value for demo"
+              placeholder="Enter your password"
               required
             />
           </div>
@@ -111,6 +74,7 @@ const Login = ({ onLogin }) => {
 
         <div className="auth-footer">
           <p>Don't have an account? <a href="/signup">Sign up here</a></p>
+          <p><a href="/forgot-password">Forgot your password?</a></p>
         </div>
       </div>
     </div>

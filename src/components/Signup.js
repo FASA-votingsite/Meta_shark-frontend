@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-//import axios from 'axios';
+import { authAPI } from '../services/authService';
 import '../styles/Auth.css';
 
 const Signup = ({ onLogin }) => {
@@ -9,7 +9,8 @@ const Signup = ({ onLogin }) => {
     password: '',
     confirmPassword: '',
     referralCode: '',
-    couponCode: ''
+    couponCode: '',
+    whatsappNumber: ''
   });
   const [packages, setPackages] = useState([]);
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -18,44 +19,8 @@ const Signup = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Package selection, 2: Registration
   const [packagesLoading, setPackagesLoading] = useState(true);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
-  console.log('Current step:', step);
-  console.log('Packages data:', packages);
-  console.log('Packages loading:', packagesLoading);
-
-  // Mock packages data - use this if API fails
-  const mockPackages = [
-    {
-      id: 1,
-      name: 'Pro Package',
-      type: 'pro',
-      price: 10000,
-      description: 'Premium package with automatic features',
-      features: [
-        'Auto claim reward',
-        'Earn ₦4,000 per referred user',
-        '₦1,000 daily login bonus',
-        'Fast withdrawal processing',
-        'Priority support'
-      ]
-    },
-    {
-      id: 2,
-      name: 'Silver Package',
-      type: 'silver',
-      price: 8000,
-      description: 'Standard package with manual features',
-      features: [
-        'Manual features',
-        'Earn ₦3,000 per referred user',
-        '₦700 daily game bonus',
-        'Standard withdrawal processing',
-        'Basic support'
-      ]
-    }
-  ];
-
-  
   useEffect(() => {
     fetchPackages();
   }, []);
@@ -63,17 +28,20 @@ const Signup = ({ onLogin }) => {
   const fetchPackages = useCallback(async () => {
     try {
       setPackagesLoading(true);
-      // Try to fetch from API first
-      //const response = await axios.get('/api/packages/');
-      setPackages(mockPackages);
+      const response = await fetch('/api/packages/');
+      if (response.ok) {
+        const packagesData = await response.json();
+        setPackages(packagesData);
+      } else {
+        throw new Error('Failed to fetch packages');
+      }
     } catch (error) {
-      console.error('Error fetching packages, using mock data:', error);
-      // Use mock data if API fails
-      setPackages(mockPackages);
+      console.error('Error fetching packages:', error);
+      setError('Failed to load packages. Please try again later.');
     } finally {
       setPackagesLoading(false);
     }
-  });
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -83,32 +51,41 @@ const Signup = ({ onLogin }) => {
   };
 
   const validateCoupon = async () => {
-    if (!formData.couponCode) {
+    if (!formData.couponCode.trim()) {
       setError('Please enter a coupon code');
       return;
     }
 
     try {
-      // Mock coupon validation for now
-      setTimeout(() => {
-        const mockPackage = mockPackages.find(p => p.type === 'pro'); // Default to pro for demo
-        setCouponValid(mockPackage);
-        setSelectedPackage(mockPackage);
+      setValidatingCoupon(true);
+      setError('');
+      
+      const response = await authAPI.validateCoupon(formData.couponCode);
+      
+      if (response.valid) {
+        setCouponValid(response.package);
+        setSelectedPackage(response.package);
         setError('');
-      }, 500);
+      } else {
+        setCouponValid(false);
+        setError(response.detail || 'Invalid coupon code');
+      }
     } catch (error) {
       setCouponValid(false);
-      setError('Error validating coupon code');
+      setError(error.message || 'Error validating coupon code');
+    } finally {
+      setValidatingCoupon(false);
     }
   };
 
   const redirectToWhatsApp = (packageType) => {
-    const packageInfo = packages.find(p => p.type === packageType) || mockPackages.find(p => p.type === packageType);
-    const message = `Hello! I want to purchase the ${packageInfo.name} for ₦${packageInfo.price.toLocaleString()}. 
-    Please generate a coupon code for me.`;
+    const packageInfo = packages.find(p => p.package_type === packageType);
+    if (!packageInfo) return;
+
+    const message = `Hello! I want to purchase the ${packageInfo.name} package for ₦${parseFloat(packageInfo.price).toLocaleString()}. Please provide me with a coupon code.`;
     const encodedMessage = encodeURIComponent(message);
     // Replace with your actual WhatsApp number
-    window.open(`https://wa.me/message/6RA3GBWCYXUWP1?text=${encodedMessage}`, '_blank');
+    window.open(`https://wa.me/2349012345678?text=${encodedMessage}`, '_blank');
   };
 
   const handleSubmit = async (e) => {
@@ -116,6 +93,7 @@ const Signup = ({ onLogin }) => {
     setLoading(true);
     setError('');
 
+    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
@@ -128,31 +106,38 @@ const Signup = ({ onLogin }) => {
       return;
     }
 
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Mock signup for now
-      setTimeout(() => {
-        const mockUser = {
-          id: 1,
-          username: formData.username,
-          email: formData.email,
-          package: selectedPackage,
-          wallet_balance: 0,
-          referral_code: 'META' + Math.random().toString(36).substr(2, 5).toUpperCase()
-        };
-        
-        const mockToken = 'mock_jwt_token_' + Date.now();
-        onLogin(mockToken, mockUser);
-        setLoading(false);
-      }, 1000);
+      const userData = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        coupon_code: formData.couponCode,
+        referral_code: formData.referralCode || '',
+        phone_number: formData.whatsappNumber || ''
+      };
+
+      const response = await authAPI.register(userData);
+      
+      if (response.token && response.user) {
+        onLogin(response.token, response.user);
+      } else {
+        throw new Error('Registration failed');
+      }
     } catch (error) {
-      setError('Signup failed. Please try again.');
+      setError(error.message || 'Signup failed. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
 
   // Step 1: Package Selection
   if (step === 1) {
-    
     return (
       <div className="auth-container">
         <div className="auth-card">
@@ -161,6 +146,8 @@ const Signup = ({ onLogin }) => {
             <p>Select a package and get a coupon code to start monetizing your content</p>
           </div>
 
+          {error && <div className="auth-error">{error}</div>}
+
           {packagesLoading ? (
             <div className="loading-packages">
               <i className="fas fa-spinner fa-spin"></i>
@@ -168,11 +155,11 @@ const Signup = ({ onLogin }) => {
             </div>
           ) : (
             <div className="packages-grid">
-              {(packages.length > 0 ? packages : mockPackages).map(pkg => (
+              {packages.map(pkg => (
                 <div key={pkg.id} className="package-card">
                   <div className="package-header">
                     <h3>{pkg.name}</h3>
-                    <div className="package-price">₦{pkg.price.toLocaleString()}</div>
+                    <div className="package-price">₦{parseFloat(pkg.price).toLocaleString()}</div>
                   </div>
                   
                   <div className="package-description">
@@ -180,17 +167,29 @@ const Signup = ({ onLogin }) => {
                   </div>
                   
                   <div className="package-features">
-                    {pkg.features.map((feature, index) => (
+                    {pkg.features && pkg.features.map((feature, index) => (
                       <div key={index} className="feature-item">
                         <i className="fas fa-check"></i>
                         <span>{feature}</span>
                       </div>
                     ))}
+                    <div className="feature-item">
+                      <i className="fas fa-check"></i>
+                      <span>Referral Bonus: ₦{parseFloat(pkg.referral_bonus).toLocaleString()}</span>
+                    </div>
+                    <div className="feature-item">
+                      <i className="fas fa-check"></i>
+                      <span>Daily Login: ₦{parseFloat(pkg.daily_login_bonus).toLocaleString()}</span>
+                    </div>
+                    <div className="feature-item">
+                      <i className="fas fa-check"></i>
+                      <span>Daily Game: ₦{parseFloat(pkg.daily_game_bonus).toLocaleString()}</span>
+                    </div>
                   </div>
                   
                   <button 
                     className="whatsapp-button"
-                    onClick={() => redirectToWhatsApp(pkg.type)}
+                    onClick={() => redirectToWhatsApp(pkg.package_type)}
                   >
                     <i className="fab fa-whatsapp"></i>
                     Purchase {pkg.name} on WhatsApp
@@ -230,7 +229,7 @@ const Signup = ({ onLogin }) => {
           {couponValid && (
             <div className="coupon-success">
               <i className="fas fa-check-circle"></i>
-              Valid coupon for {couponValid.name} (₦{couponValid.price.toLocaleString()})
+              Valid coupon for {couponValid.name} (₦{parseFloat(couponValid.price).toLocaleString()})
             </div>
           )}
           
@@ -244,9 +243,15 @@ const Signup = ({ onLogin }) => {
                 onChange={handleChange}
                 placeholder="Enter your coupon code"
                 required
+                disabled={validatingCoupon}
               />
-              <button type="button" onClick={validateCoupon} className="validate-button">
-                Validate
+              <button 
+                type="button" 
+                onClick={validateCoupon} 
+                className="validate-button"
+                disabled={validatingCoupon}
+              >
+                {validatingCoupon ? 'Validating...' : 'Validate'}
               </button>
             </div>
           </div>
@@ -258,18 +263,32 @@ const Signup = ({ onLogin }) => {
               name="username"
               value={formData.username}
               onChange={handleChange}
+              placeholder="Choose a username"
               required
+              minLength={3}
             />
           </div>
 
           <div className="form-group">
-            <label>Email *</label>
+            <label>Email Address *</label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
+              placeholder="Enter your email address"
               required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>WhatsApp Number</label>
+            <input
+              type="tel"
+              name="whatsappNumber"
+              value={formData.whatsappNumber}
+              onChange={handleChange}
+              placeholder="Enter your WhatsApp number"
             />
           </div>
 
@@ -280,7 +299,9 @@ const Signup = ({ onLogin }) => {
               name="password"
               value={formData.password}
               onChange={handleChange}
+              placeholder="Create a password (min. 6 characters)"
               required
+              minLength={6}
             />
           </div>
 
@@ -291,6 +312,7 @@ const Signup = ({ onLogin }) => {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
+              placeholder="Confirm your password"
               required
             />
           </div>
@@ -302,10 +324,15 @@ const Signup = ({ onLogin }) => {
               name="referralCode"
               value={formData.referralCode}
               onChange={handleChange}
+              placeholder="Enter referral code if any"
             />
           </div>
 
-          <button type="submit" disabled={loading || !couponValid} className="auth-button">
+          <button 
+            type="submit" 
+            disabled={loading || !couponValid} 
+            className="auth-button"
+          >
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>

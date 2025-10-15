@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { referralsAPI } from '../services/apiService';
+import { getPackageFeatures } from '../utils/packageFeatures';
 import '../styles/ReferralSystem.css';
-import { NAIRA_SIGN } from '@bilmapay/react-currency-symbols';
 
 const ReferralSystem = ({ user }) => {
   const [referrals, setReferrals] = useState([]);
@@ -19,13 +19,13 @@ const ReferralSystem = ({ user }) => {
 
   const fetchReferralData = async () => {
     try {
-      const [statsResponse, referralsResponse] = await Promise.all([
-        axios.get('/api/referrals/stats/'),
-        axios.get('/api/referrals/')
+      const [referralsData, statsData] = await Promise.all([
+        referralsAPI.getReferrals(),
+        referralsAPI.getReferralStats()
       ]);
       
-      setReferralStats(statsResponse.data);
-      setReferrals(referralsResponse.data);
+      setReferrals(referralsData);
+      setReferralStats(statsData);
     } catch (error) {
       console.error('Error fetching referral data:', error);
     } finally {
@@ -34,11 +34,13 @@ const ReferralSystem = ({ user }) => {
   };
 
   const copyReferralLink = () => {
-    const referralLink = `${window.location.origin}/signup?ref=${user.referralCode}`;
+    const referralLink = `${window.location.origin}/signup?ref=${user.referral_code}`;
     navigator.clipboard.writeText(referralLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const userFeatures = getPackageFeatures(user.package_tier);
 
   if (loading) {
     return <div className="referral-loading">Loading referral data...</div>;
@@ -48,12 +50,12 @@ const ReferralSystem = ({ user }) => {
     <div className="referral-system">
       <div className="referral-header">
         <h1>Referral Program</h1>
-        <p>Earn up to 4000 Naira for each friend you refer to META_SHARK</p>
+        <p>Earn {userFeatures.referralBonus} for each friend you refer to META_SHARK</p>
       </div>
 
       <div className="referral-stats">
         <div className="referral-stat">
-          <h3>{NAIRA_SIGN}{referralStats.totalEarnings.toFixed(2)}</h3>
+          <h3>₦{referralStats.totalEarnings.toLocaleString()}</h3>
           <p>Total Referral Balance</p>
         </div>
         <div className="referral-stat">
@@ -61,7 +63,7 @@ const ReferralSystem = ({ user }) => {
           <p>Total Referrals</p>
         </div>
         <div className="referral-stat">
-          <h3>{NAIRA_SIGN}{referralStats.pendingEarnings.toFixed(2)}</h3>
+          <h3>₦{referralStats.pendingEarnings.toLocaleString()}</h3>
           <p>Pending Earnings</p>
         </div>
       </div>
@@ -69,14 +71,13 @@ const ReferralSystem = ({ user }) => {
       <div className="referral-share">
         <h2>Your Referral Code</h2>
         <div className="referral-code-box">
-          <code>{user.referralCode}</code>
+          <code>{user.referral_code}</code>
           <button onClick={copyReferralLink} className="copy-button">
             {copied ? 'Copied!' : 'Copy Link'}
           </button>
         </div>
         <p className="referral-note">
-          Share your referral link with friends. 
-          You'll earn 4000 Naira when they sign up and submit their first content.
+          Share your referral link with friends. You'll earn {userFeatures.referralBonus} when they sign up and purchase a package.
         </p>
       </div>
 
@@ -93,8 +94,10 @@ const ReferralSystem = ({ user }) => {
                   <p>Joined on {new Date(referral.referral_date).toLocaleDateString()}</p>
                 </div>
                 <div className="referral-earning">
-                  <span className="earning-amount">+{NAIRA_SIGN}{referral.reward_earned}</span>
-                  <span className={`status {NAIRA_SIGN}{referral.status}`}>{referral.status}</span>
+                  <span className="earning-amount">+₦{referral.reward_earned.toLocaleString()}</span>
+                  <span className={`status ${referral.is_paid ? 'paid' : 'pending'}`}>
+                    {referral.is_paid ? 'Paid' : 'Pending'}
+                  </span>
                 </div>
               </div>
             ))}

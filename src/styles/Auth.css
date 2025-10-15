@@ -37,12 +37,42 @@
   gap: 20px;
 }
 
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.form-group input {
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 16px;
+  transition: border-color 0.3s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.form-group input::placeholder {
+  color: #bdc3c7;
+}
+
 .auth-error {
   background: #ffebee;
   color: #c62828;
   padding: 12px 15px;
   border-radius: 5px;
   border-left: 4px solid #c62828;
+  font-weight: 500;
 }
 
 .auth-button {
@@ -76,6 +106,7 @@
 
 .auth-footer p {
   color: #7f8c8d;
+  margin-bottom: 10px;
 }
 
 .auth-footer a {
@@ -272,6 +303,24 @@
   color: #2980b9;
 }
 
+/* Phone Input Specific Styles */
+.phone-input-group {
+  position: relative;
+}
+
+.phone-prefix {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.phone-input {
+  padding-left: 50px !important;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .packages-grid {
@@ -299,6 +348,11 @@
     padding: 12px 15px;
     font-size: 14px;
   }
+  
+  .auth-card {
+    padding: 20px;
+    margin: 10px;
+  }
 }
 
 /* Ensure the auth container has enough space */
@@ -322,4 +376,62 @@
 /* For package selection step, we need a wider card */
 .auth-card[style*="max-width: 500px"] {
   max-width: 900px !important;
+}
+
+/* Password strength indicator */
+.password-strength {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.password-strength.weak {
+  color: #e74c3c;
+}
+
+.password-strength.medium {
+  color: #f39c12;
+}
+
+.password-strength.strong {
+  color: #27ae60;
+}
+
+/* WhatsApp number specific styling */
+.whatsapp-input-group {
+  position: relative;
+}
+
+.whatsapp-prefix {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+  font-weight: 500;
+  z-index: 2;
+}
+
+.whatsapp-input {
+  padding-left: 45px !important;
+}
+
+/* Enhanced form validation styling */
+.form-group input:invalid {
+  border-color: #e74c3c;
+}
+
+.form-group input:valid {
+  border-color: #27ae60;
+}
+
+/* Loading state improvements */
+.validate-button:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.auth-button:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { platformAPI, dashboardAPI } from '../services/apiService';
 import '../styles/PlatformComponent.css';
 
 const TikTokComponent = () => {
@@ -17,7 +17,6 @@ const TikTokComponent = () => {
     pendingSubmissions: 0
   });
 
-  // Fetch user data and submissions
   useEffect(() => {
     fetchUserData();
     fetchSubmissions();
@@ -25,14 +24,11 @@ const TikTokComponent = () => {
 
   const fetchUserData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/dashboard/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setBalance(response.data.wallet_balance);
+      const dashboardData = await dashboardAPI.getDashboardData();
+      setBalance(dashboardData.wallet_balance);
       
       // Calculate TikTok-specific stats
-      const tiktokSubmissions = response.data.recent_submissions.filter(
+      const tiktokSubmissions = dashboardData.recent_submissions.filter(
         sub => sub.platform === 'tiktok'
       );
       const approved = tiktokSubmissions.filter(sub => sub.status === 'approved');
@@ -53,15 +49,7 @@ const TikTokComponent = () => {
 
   const fetchSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/content/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Filter TikTok submissions only
-      const tiktokSubmissions = response.data.filter(
-        submission => submission.platform === 'tiktok'
-      );
+      const tiktokSubmissions = await platformAPI.tiktok.getSubmissions();
       setSubmissions(tiktokSubmissions);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -82,21 +70,11 @@ const TikTokComponent = () => {
     setMessage('');
     
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/api/content/', 
-        {
-          ...formData,
-          platform: 'tiktok'
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      
+      await platformAPI.tiktok.submitVideo(formData);
       setMessage('TikTok video submitted successfully! It will be reviewed shortly.');
       setFormData({ video_url: '', description: '' });
-      fetchSubmissions(); // Refresh the list
-      fetchUserData(); // Refresh stats
+      fetchSubmissions();
+      fetchUserData();
     } catch (error) {
       console.error('Error submitting content:', error);
       setMessage(error.response?.data?.error || 'Error submitting video. Please try again.');

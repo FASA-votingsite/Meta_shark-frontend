@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { walletAPI } from '../services/apiService';
+import { getPackageFeatures } from '../utils/packageFeatures';
 import '../styles/Withdrawal.css';
 
 const Withdrawal = ({ user }) => {
@@ -56,24 +57,15 @@ const Withdrawal = ({ user }) => {
 
   const fetchWithdrawalData = async () => {
     try {
-      // Replace with actual API calls
-      const token = localStorage.getItem('token');
-      const [balanceResponse, transactionsResponse] = await Promise.all([
-        axios.get('/api/dashboard/', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('/api/transactions/', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+      const [balanceData, transactionsData] = await Promise.all([
+        walletAPI.getBalance(),
+        walletAPI.getTransactions()
       ]);
-
-      setBalance(balanceResponse.data.balance || 0);
-      setTransactions(transactionsResponse.data || []);
+      
+      setBalance(balanceData.balance);
+      setTransactions(transactionsData);
     } catch (error) {
       console.error('Error fetching withdrawal data:', error);
-      // Fallback to empty data if API fails
-      setBalance(0);
-      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -111,38 +103,9 @@ const Withdrawal = ({ user }) => {
       return;
     }
 
-    if (formData.userPassword.length < 4) {
-      setError('Please enter your password');
-      setWithdrawalLoading(false);
-      return;
-    }
-
-    if (!formData.bankName.trim()) {
-      setError('Please enter your bank name');
-      setWithdrawalLoading(false);
-      return;
-    }
-
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/api/withdrawals/', {
-        bank_name: formData.bankName,
-        account_number: formData.accountNumber,
-        account_name: formData.accountName,
-        amount: parseFloat(formData.amount),
-        password: formData.userPassword
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Update local state with the response data
-      const newTransaction = response.data;
-      setTransactions([newTransaction, ...transactions]);
-      setBalance(balance - parseFloat(formData.amount));
-      setSuccess(`Withdrawal request of ₦${parseFloat(formData.amount).toLocaleString()} 
-      submitted successfully! It will be processed within 24 hours.`);
-      
-      // Reset form
+      await walletAPI.requestWithdrawal(formData);
+      setSuccess(`Withdrawal request of ₦${parseFloat(formData.amount).toLocaleString()} submitted successfully! It will be processed within 24-48 hours.`);
       setFormData({
         bankName: '',
         accountNumber: '',
@@ -150,9 +113,9 @@ const Withdrawal = ({ user }) => {
         userPassword: '',
         amount: ''
       });
+      fetchWithdrawalData(); // Refresh data
     } catch (error) {
-      console.error('Withdrawal error:', error);
-      setError(error.response?.data?.message || 'Withdrawal request failed. Please try again.');
+      setError(error.message || 'Withdrawal request failed. Please try again.');
     } finally {
       setWithdrawalLoading(false);
     }
@@ -161,19 +124,12 @@ const Withdrawal = ({ user }) => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: 'NGN'
+      currency: 'NGN',
+      minimumFractionDigits: 0
     }).format(amount);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-NG', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const userFeatures = getPackageFeatures(user.package_tier);
 
   if (loading) {
     return <div className="withdrawal-loading">Loading withdrawal data...</div>;
@@ -184,6 +140,15 @@ const Withdrawal = ({ user }) => {
       <div className="withdrawal-header">
         <h1>Withdraw Your Earnings</h1>
         <p>Transfer your earnings to your bank account</p>
+        <div className="withdrawal-priority">
+          <i className="fas fa-info-circle"></i>
+          <span>
+            {userFeatures.withdrawalSpeed === 'fast' 
+              ? 'Pro Priority: Withdrawals processed within 1-2 hours' 
+              : 'Standard Processing: Withdrawals processed within 24-48 hours'
+            }
+          </span>
+        </div>
       </div>
 
       <div className="balance-section">
@@ -226,7 +191,6 @@ const Withdrawal = ({ user }) => {
                 onChange={handleChange}
                 placeholder="Enter 10-digit account number"
                 maxLength="10"
-                pattern="[0-9]{10}"
                 required
               />
             </div>
@@ -255,10 +219,8 @@ const Withdrawal = ({ user }) => {
                 placeholder="Enter amount in Naira"
                 min="1000"
                 max={balance}
-                step="100"
                 required
               />
-              <small>Minimum: ₦1,000 | Maximum: {formatCurrency(balance)}</small>
             </div>
           </div>
 
@@ -278,10 +240,9 @@ const Withdrawal = ({ user }) => {
             <h4>Withdrawal Information:</h4>
             <ul>
               <li>Minimum withdrawal amount: ₦1,000</li>
-              <li>Processing time: 24-48 hours</li>
+              <li>Processing time: {userFeatures.withdrawalSpeed === 'fast' ? '1-2 hours' : '24-48 hours'}</li>
               <li>No withdrawal fees</li>
               <li>Ensure your account details are correct</li>
-              <li>Withdrawals are processed on business days only</li>
             </ul>
           </div>
 
@@ -308,14 +269,11 @@ const Withdrawal = ({ user }) => {
             {transactions.map(transaction => (
               <div key={transaction.id} className="transaction-item">
                 <div className="transaction-info">
-                  <h4>{transaction.description || `Withdrawal to ${transaction.bank_name}`}</h4>
-                  <span className="transaction-date">{formatDate(transaction.date || transaction.created_at)}</span>
-                  <span className={`transaction-status ${transaction.status}`}>
-                    {transaction.status}
-                  </span>
+                  <h4>{transaction.description}</h4>
+                  <span>{new Date(transaction.date).toLocaleDateString()}</span>
                 </div>
-                <div className={`transaction-amount ${transaction.transaction_type === 'payout' ? 'debit' : 'credit'}`}>
-                  {transaction.transaction_type === 'payout' ? '-' : '+'}{formatCurrency(transaction.amount)}
+                <div className={`transaction-amount ${transaction.amount > 0 ? 'credit' : 'debit'}`}>
+                  {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
                 </div>
               </div>
             ))}
