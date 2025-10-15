@@ -1,9 +1,10 @@
 import { API_BASE_URL } from '../config/environment';
-import { getToken } from './authService'; // Remove logout import since it's not exported
+import { authAPI } from './authService'; // Import authAPI instead of getToken
+
 
 // Generic API request function
 const apiRequest = async (endpoint, options = {}) => {
-  const token = getToken();
+  const token = authAPI.getToken();
   
   const defaultHeaders = {
     'Content-Type': 'application/json',
@@ -24,12 +25,10 @@ const apiRequest = async (endpoint, options = {}) => {
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
-    // Handle unauthorized (token expired)
-    if (response.status === 401) {
-      // Use window.location directly since logout is not imported
-      localStorage.removeItem('metashark_token');
-      localStorage.removeItem('metashark_user');
-      window.location.href = '/login';
+    // Handle unauthorized/forbidden (token expired or invalid)
+    if (response.status === 401 || response.status === 403) {
+      console.log('🔐 Authentication failed, clearing token...');
+      authAPI.clearAuth(); // Use the new method
       throw new Error('Authentication failed. Please login again.');
     }
     
@@ -67,7 +66,6 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
-// Dashboard API
 export const dashboardAPI = {
   getDashboardData: () => apiRequest('/api/dashboard/'),
   getEarningsBreakdown: () => apiRequest('/api/dashboard/earnings/'),
@@ -141,7 +139,7 @@ export const profileAPI = {
     })
 };
 
-// Platform-specific APIs - ADD THIS SECTION
+// Platform-specific APIs
 export const platformAPI = {
   // TikTok specific
   tiktok: {
@@ -171,8 +169,11 @@ export const platformAPI = {
   }
 };
 
+export { apiRequest };
+
 // Create named export object to fix ESLint warning
 const apiServices = {
+  apiRequest,
   dashboard: dashboardAPI,
   packages: packagesAPI,
   content: contentAPI,
@@ -180,7 +181,7 @@ const apiServices = {
   games: gamesAPI,
   wallet: walletAPI,
   profile: profileAPI,
-  platform: platformAPI // Add platformAPI to exports
+  platform: platformAPI
 };
 
 // Export all APIs

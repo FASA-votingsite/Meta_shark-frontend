@@ -129,10 +129,6 @@ const InstagramComponent = () => {
 
       <div className="platform-stats">
         <div className="platform-stat">
-          <h3>₦{balance.toLocaleString()}</h3>
-          <p>Total Balance</p>
-        </div>
-        <div className="platform-stat">
           <h3>₦{stats.totalEarnings.toLocaleString()}</h3>
           <p>Instagram Earnings</p>
         </div>

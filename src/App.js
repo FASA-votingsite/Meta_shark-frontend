@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { authAPI } from './services/authService';
-import { API_BASE_URL } from './config/environment';
 
 // Import components
 import Navbar from './components/Navbar';
@@ -20,21 +19,34 @@ import ContentSubmission from './components/ContentSubmission';
 // Import CSS
 import './styles/App.css';
 
-// Configure axios base URL if using axios
-//axios.defaults.baseURL = API_BASE_URL;
-
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
-    if (authAPI.isAuthenticated()) {
-      const savedUser = authAPI.getUser();
-      setUser(savedUser);
-    }
-    setLoading(false);
+    checkAuthentication();
   }, []);
+
+  const checkAuthentication = () => {
+    try {
+      // Simply check if we have a token and user data
+      if (authAPI.isAuthenticated()) {
+        const savedUser = authAPI.getUser();
+        if (savedUser) {
+          setUser(savedUser);
+        } else {
+          // User data is missing but token exists - clear everything
+          authAPI.clearAuth();
+        }
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      // Clear any corrupted auth data
+      authAPI.clearAuth();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = (token, userData) => {
     authAPI.setToken(token);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../services/apiService';
+import { authAPI } from '../services/authService';
 import { 
   getPackageFeatures, 
   formatCurrency, 
@@ -15,6 +16,7 @@ const Dashboard = ({ user }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardData();
@@ -22,50 +24,116 @@ const Dashboard = ({ user }) => {
 
   const fetchDashboardData = async () => {
     try {
+      setLoading(true);
+      setError('');
+      
+      console.log('📊 Fetching dashboard data...');
       const data = await dashboardAPI.getDashboardData();
+      console.log('📊 Dashboard data received:', data);
       setDashboardData(data);
+      
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data');
+      console.error('❌ Error fetching dashboard data:', error);
+      
+      // Handle authentication errors
+      if (error.message.includes('Authentication failed') || 
+          error.message.includes('Invalid token') ||
+          error.message.includes('401') ||
+          error.message.includes('403')) {
+        
+        console.log('🔐 Authentication error detected, redirecting to login...');
+        authAPI.clearAuth();
+        navigate('/login');
+        return;
+      }
+      
+      setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRetry = () => {
+    fetchDashboardData();
+  };
+
+  const handleLogout = () => {
+    authAPI.logout();
+    navigate('/login');
+  };
+
   if (loading) {
-    return <div className="dashboard-loading">Loading your dashboard...</div>;
+    return (
+      <div className="dashboard-loading">
+        <div className="loading-spinner"></div>
+        <p>Loading your dashboard...</p>
+      </div>
+    );
   }
 
-  if (error) {
-    return <div className="dashboard-error">{error}</div>;
+  if (error && !dashboardData) {
+    return (
+      <div className="dashboard-error">
+        <div className="error-icon">
+          <i className="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>Unable to Load Dashboard</h3>
+        <p>{error}</p>
+        <div className="error-actions">
+          <button onClick={handleRetry} className="retry-button">
+            <i className="fas fa-redo"></i> Try Again
+          </button>
+          <button onClick={handleLogout} className="logout-button">
+            <i className="fas fa-sign-out-alt"></i> Logout
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  if (!dashboardData) {
-    return <div className="dashboard-error">No data available</div>;
+  // If we have partial data but an error occurred
+  if (error && dashboardData) {
+    console.warn('⚠️ Dashboard loaded with errors:', error);
   }
+
+  // Use safe fallback data if dashboardData is null
+  const safeData = dashboardData || {
+    wallet_balance: user?.wallet_balance || 0,
+    total_earnings: user?.total_earnings || 0,
+    package: user?.package || null,
+    submission_count: 0,
+    referral_count: 0,
+    recent_transactions: [],
+    referral_stats: { total_referrals: 0, total_earned: 0 }
+  };
 
   const packageTier = getUserPackageTier(user);
   const userFeatures = getPackageFeatures(packageTier);
-  const { recent_transactions, referral_stats } = dashboardData;
-  const stats = getSafeStats(dashboardData);
+  const { recent_transactions, referral_stats } = safeData;
+  const stats = getSafeStats(safeData);
 
   return (
     <div className="dashboard">
+      {/* Show error banner if we have an error but still showing data */}
+      {error && dashboardData && (
+        <div className="dashboard-warning">
+          <i className="fas fa-exclamation-circle"></i>
+          <span>Some data may not be up to date. {error}</span>
+          <button onClick={handleRetry} className="retry-small">
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="dashboard-header">
         <div className="user-welcome">
           <h1>
-            Welcome, {user.username} 
+            Welcome, {user?.username || 'User'} 
             <PackageBadge tier={packageTier} />
           </h1>
           <p>Package: {userFeatures.label} - Enjoy your exclusive benefits!</p>
         </div>
-        
-        <div className="wallet-overview">
-          <div className="wallet-balance">
-            <h2>Total Balance</h2>
-            <div className="balance-amount">{formatCurrency(stats.totalEarnings)}</div>
-          </div>
-        </div>
+      
       </div>
 
       <div className='board'>
@@ -158,11 +226,11 @@ const Dashboard = ({ user }) => {
       <div className="dashboard-grid">
         <div className="recent-activity">
           <h3>Recent Activity</h3>
-          {recent_transactions && recent_transactions.length === 0 ? (
+          {(!recent_transactions || recent_transactions.length === 0) ? (
             <p className="no-activity">No recent activity</p>
           ) : (
             <div className="activity-list">
-              {recent_transactions && recent_transactions.slice(0, 5).map(transaction => (
+              {recent_transactions.slice(0, 5).map(transaction => (
                 <div key={transaction.id} className="activity-item">
                   <div className="activity-icon">
                     <i className={`fas ${getTransactionIcon(transaction.transaction_type)}`}></i>

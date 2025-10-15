@@ -1,33 +1,14 @@
 import { API_BASE_URL } from '../config/environment';
 
-// Token management
-export const getToken = () => localStorage.getItem('metashark_token');
-export const setToken = (token) => localStorage.setItem('metashark_token', token);
-export const removeToken = () => localStorage.removeItem('metashark_token');
-       
-// User management
-export const getUser = () => {
-  const userStr = localStorage.getItem('metashark_user');
-  return userStr ? JSON.parse(userStr) : null;
-};
-
-export const setUser = (user) => {
-  localStorage.setItem('metashark_user', JSON.stringify(user));
-};
-
-export const removeUser = () => {
-  localStorage.removeItem('metashark_user');
-};
-
 // Helper function for API calls
 const apiRequest = async (endpoint, options = {}) => {
-  const token = getToken();
+  const token = localStorage.getItem('metashark_token');
   const defaultHeaders = {
     'Content-Type': 'application/json',
   };
 
   if (token) {
-    defaultHeaders['Authorization'] = `Token ${token}`; // Use 'Token' not 'Bearer'
+    defaultHeaders['Authorization'] = `Token ${token}`;
   }
 
   const config = {
@@ -50,7 +31,7 @@ const apiRequest = async (endpoint, options = {}) => {
       let errorMessage = `HTTP error! status: ${response.status}`;
       try {
         const errorData = await response.json();
-        console.log('Error response:', errorData); // Debug log
+        console.log('Error response:', errorData);
         errorMessage = errorData.detail || errorData.message || errorMessage;
         
         // Handle specific error cases
@@ -83,10 +64,56 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
-// Authentication API calls
+// Authentication API - Everything under authAPI
 export const authAPI = {
-  // Login user - FIXED ENDPOINT
+  // Token management
+  getToken: () => localStorage.getItem('metashark_token'),
+  setToken: (token) => localStorage.setItem('metashark_token', token),
+  removeToken: () => localStorage.removeItem('metashark_token'),
+  
+  // User management
+  getUser: () => {
+    const userStr = localStorage.getItem('metashark_user');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+  setUser: (user) => {
+    localStorage.setItem('metashark_user', JSON.stringify(user));
+  },
+  removeUser: () => {
+    localStorage.removeItem('metashark_user');
+  },
+
+  // Clear all authentication data
+  clearAuth: () => {
+    localStorage.removeItem('metashark_token');
+    localStorage.removeItem('metashark_user');
+    console.log('🔐 Auth data cleared');
+  },
+
+  // Validate token with server (optional - for future use)
+  validateToken: async () => {
+    try {
+      const token = authAPI.getToken();
+      if (!token) return false;
+      
+      // This endpoint might not exist yet, so we'll handle the error
+      const response = await apiRequest('/api/auth/verify-token/', {
+        method: 'POST',
+        body: { token }
+      });
+      return true;
+    } catch (error) {
+      console.log('❌ Token validation failed:', error.message);
+      // Clear invalid token
+      authAPI.clearAuth();
+      return false;
+    }
+  },
+
+  // API calls
   login: async (username, password) => {
+    console.log('Sending login request:', { username, password });
+    
     const response = await apiRequest('/api/auth/login/', {
       method: 'POST',
       body: { 
@@ -95,15 +122,16 @@ export const authAPI = {
       },
     });
 
+    console.log('Login response:', response);
+
     if (response.token && response.user) {
-      setToken(response.token);
-      setUser(response.user);
+      authAPI.setToken(response.token);
+      authAPI.setUser(response.user);
     }
 
     return response;
   },
 
-  // Register user with coupon - FIXED ENDPOINT
   register: async (userData) => {
     const response = await apiRequest('/api/auth/register/', {
       method: 'POST',
@@ -111,14 +139,13 @@ export const authAPI = {
     });
 
     if (response.token && response.user) {
-      setToken(response.token);
-      setUser(response.user);
+      authAPI.setToken(response.token);
+      authAPI.setUser(response.user);
     }
 
     return response;
   },
 
-  // Validate coupon code - FIXED ENDPOINT
   validateCoupon: async (couponCode) => {
     return await apiRequest('/api/auth/validate-coupon/', {
       method: 'POST',
@@ -126,16 +153,13 @@ export const authAPI = {
     });
   },
 
-  // Logout user
   logout: () => {
-    removeToken();
-    removeUser();
+    authAPI.clearAuth();
     window.location.href = '/login';
   },
 
-  // Check if user is authenticated
   isAuthenticated: () => {
-    return !!getToken();
+    return !!authAPI.getToken();
   }
 };
 

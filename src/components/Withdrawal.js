@@ -122,7 +122,7 @@ const Withdrawal = ({ user }) => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-NG', {
+    return new Intl.NumberFormat({
       style: 'currency',
       currency: 'NGN',
       minimumFractionDigits: 0

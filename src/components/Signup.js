@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { authAPI } from '../services/authService';
+import { packagesAPI } from '../services/apiService';
 import '../styles/Auth.css';
 
 const Signup = ({ onLogin }) => {
@@ -17,7 +18,7 @@ const Signup = ({ onLogin }) => {
   const [couponValid, setCouponValid] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: Package selection, 2: Registration
+  const [step, setStep] = useState(1);
   const [packagesLoading, setPackagesLoading] = useState(true);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
 
@@ -28,15 +29,14 @@ const Signup = ({ onLogin }) => {
   const fetchPackages = useCallback(async () => {
     try {
       setPackagesLoading(true);
-      const response = await fetch('/api/packages/');
-      if (response.ok) {
-        const packagesData = await response.json();
-        setPackages(packagesData);
-      } else {
-        throw new Error('Failed to fetch packages');
-      }
+      console.log('📦 Fetching packages using packagesAPI...');
+      
+      const packagesData = await packagesAPI.getAllPackages();
+      console.log('📦 Packages data received:', packagesData);
+      setPackages(packagesData);
+      
     } catch (error) {
-      console.error('Error fetching packages:', error);
+      console.error('📦 Error fetching packages:', error);
       setError('Failed to load packages. Please try again later.');
     } finally {
       setPackagesLoading(false);
@@ -82,10 +82,10 @@ const Signup = ({ onLogin }) => {
     const packageInfo = packages.find(p => p.package_type === packageType);
     if (!packageInfo) return;
 
-    const message = `Hello! I want to purchase the ${packageInfo.name} package for ₦${parseFloat(packageInfo.price).toLocaleString()}. Please provide me with a coupon code.`;
+    const message = `Hello! I want to purchase the ${packageInfo.name} package for ₦${parseFloat(packageInfo.price).toLocaleString()}.`;
     const encodedMessage = encodeURIComponent(message);
-    // Replace with your actual WhatsApp number
-    window.open(`https://wa.me/2349012345678?text=${encodedMessage}`, '_blank');
+
+    window.open(`https://wa.me/2349028526056?text=${encodedMessage}`, '_blank');
   };
 
   const handleSubmit = async (e) => {
