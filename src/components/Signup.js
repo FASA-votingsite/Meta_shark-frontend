@@ -114,27 +114,33 @@ const Signup = ({ onLogin }) => {
 
     try {
       const userData = {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        coupon_code: formData.couponCode,
-        referral_code: formData.referralCode || '',
-        phone_number: formData.whatsappNumber || ''
+      username: formData.username,
+      email: formData.email,
+      password: formData.password,
+      confirm_password: formData.confirmPassword, 
+      coupon_code: formData.couponCode,
+      referral_code: formData.referralCode || '',
+      phone_number: formData.whatsappNumber
       };
 
-      const response = await authAPI.register(userData);
-      
-      if (response.token && response.user) {
-        onLogin(response.token, response.user);
-      } else {
-        throw new Error('Registration failed');
-      }
-    } catch (error) {
-      setError(error.message || 'Signup failed. Please try again.');
-    } finally {
-      setLoading(false);
+      console.log('📝 Sending registration data:', userData);
+
+    const response = await authAPI.register(userData);
+    
+    console.log('✅ Registration response:', response);
+    
+    if (response.token && response.user) {
+      onLogin(response.token, response.user);
+    } else {
+      throw new Error('Registration failed - no token received');
     }
-  };
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    setError(error.message || 'Signup failed. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+}; 
 
   // Step 1: Package Selection
   if (step === 1) {
