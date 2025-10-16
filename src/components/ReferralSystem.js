@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { referralsAPI } from '../services/apiService';
+import { referralsAPI, profileAPI } from '../services/apiService';
 import { getPackageFeatures } from '../utils/packageFeatures';
 import '../styles/ReferralSystem.css';
 
@@ -12,6 +12,8 @@ const ReferralSystem = ({ user }) => {
   });
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
+
 
   useEffect(() => {
     fetchReferralData();
@@ -19,25 +21,45 @@ const ReferralSystem = ({ user }) => {
 
   const fetchReferralData = async () => {
     try {
-      const [referralsData, statsData] = await Promise.all([
+      const [referralsData, statsData, profileData] = await Promise.all([
         referralsAPI.getReferrals(),
-        referralsAPI.getReferralStats()
+        referralsAPI.getReferralStats(),
+        profileAPI.getProfile()
       ]);
       
-      setReferrals(referralsData);
-      setReferralStats(statsData);
+      setReferrals(referralsData || []);
+      setReferralStats(statsData || {totalReferrals: 0, totalEarnings: 0});
+      // Make sure user has referral code
+      if (profileData && !user.referral_code) {
+        user.referral_code = profileData.referral_code;
+      }
+
     } catch (error) {
       console.error('Error fetching referral data:', error);
+      setError('Failed to load referral data');
     } finally {
       setLoading(false);
     }
   };
 
   const copyReferralLink = () => {
-    const referralLink = `${window.location.origin}/signup?ref=${user.referral_code}`;
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const referralLink = `https://content-monetization-platform.netlify.app/signup?ref=
+    ${user.referral_code}`;    
+    navigator.clipboard.writeText(referralLink).then(() => {
+      alert('Referral link copied to clipboard!');
+      setCopied(true);
+      // Reset the button text after a short delay
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = referralLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('Referral link copied to clipboard!');
+    });
   };
 
   const userFeatures = getPackageFeatures(user.package_tier);
@@ -71,7 +93,7 @@ const ReferralSystem = ({ user }) => {
       <div className="referral-share">
         <h2>Your Referral Code</h2>
         <div className="referral-code-box">
-          <code>{user.referral_code}</code>
+          <code>{user.referral_code || 'Generating...'}</code>
           <button onClick={copyReferralLink} className="copy-button">
             {copied ? 'Copied!' : 'Copy Link'}
           </button>
@@ -84,17 +106,17 @@ const ReferralSystem = ({ user }) => {
       <div className="referral-list">
         <h2>Your Referrals</h2>
         {referrals.length === 0 ? (
-          <p className="no-referrals">You haven't referred anyone yet</p>
+          <p className="no-referrals">No referrals yet. Share your link to start earning!</p>
         ) : (
           <div className="referral-items">
             {referrals.map(referral => (
               <div key={referral.id} className="referral-item">
                 <div className="referral-info">
                   <h4>{referral.referee.username}</h4>
-                  <p>Joined on {new Date(referral.referral_date).toLocaleDateString()}</p>
+                  <p>Joined: {new Date(referral.referral_date).toLocaleDateString()}</p>
                 </div>
                 <div className="referral-earning">
-                  <span className="earning-amount">+₦{referral.reward_earned.toLocaleString()}</span>
+                  <span className="amount">+₦{parseFloat(referral.reward_earned).toFixed(2)}</span>
                   <span className={`status ${referral.is_paid ? 'paid' : 'pending'}`}>
                     {referral.is_paid ? 'Paid' : 'Pending'}
                   </span>

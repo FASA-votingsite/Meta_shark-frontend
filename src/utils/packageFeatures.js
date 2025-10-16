@@ -93,20 +93,23 @@ export const getPackageBadgeInfo = (packageData) => {
 export const getUserPackageTier = (user) => {
   if (!user) return 'silver';
   
-  // Check different possible locations for package data
-  if (user.package_tier) {
-    return user.package_tier;
+  // Check package_type first, then fall back to package name
+  if (user.package_type === 'pro') {
+    return 'pro';
+  } else if (user.package_type === 'silver') {
+    return 'silver';
   }
   
-  if (user.package && user.package.type) {
-    return user.package.type;
+  // Fallback: check package name
+  if (user.package && user.package.name) {
+    if (user.package.name.toLowerCase().includes('pro')) {
+      return 'pro';
+    } else if (user.package.name.toLowerCase().includes('silver')) {
+      return 'silver';
+    }
   }
   
-  if (user.package && user.package.package_type) {
-    return user.package.package_type;
-  }
-  
-  return 'silver';
+  return 'silver'; // Default fallback
 };
 
 // Constants for use in components

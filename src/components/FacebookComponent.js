@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { contentAPI } from '../services/apiService';
 import '../styles/PlatformComponent.css';
 
 const FacebookComponent = () => {
-  const [balance, setBalance] = useState(0);
   const [formData, setFormData] = useState({
     video_url: '',
     description: ''
@@ -18,53 +17,31 @@ const FacebookComponent = () => {
   });
 
   useEffect(() => {
-    fetchUserData();
     fetchSubmissions();
   }, []);
 
-  const fetchUserData = async () => {
+  const fetchSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/dashboard/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setBalance(response.data.wallet_balance);
+      setLoading(true);
+      const allSubmissions = await contentAPI.getSubmissions();
+      const facebookSubmissions = allSubmissions.filter(sub => sub.platform === 'facebook');
+      setSubmissions(facebookSubmissions);
       
-      // Calculate Facebook-specific stats
-      const facebookSubmissions = response.data.recent_submissions.filter(
-        sub => sub.platform === 'facebook'
-      );
+      // Calculate stats
       const approved = facebookSubmissions.filter(sub => sub.status === 'approved');
       const pending = facebookSubmissions.filter(sub => sub.status === 'pending');
-      
-      const facebookEarnings = approved.reduce((sum, sub) => sum + parseFloat(sub.earnings), 0);
+      const totalEarnings = approved.reduce((sum, sub) => sum + parseFloat(sub.earnings || 0), 0);
       
       setStats({
-        totalEarnings: facebookEarnings,
+        totalEarnings,
         approvedSubmissions: approved.length,
         pendingSubmissions: pending.length
       });
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      setMessage('Error loading data');
-    }
-  };
-
-  const fetchSubmissions = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/content/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Filter Facebook submissions only
-      const facebookSubmissions = response.data.filter(
-        submission => submission.platform === 'facebook'
-      );
-      setSubmissions(facebookSubmissions);
-    } catch (error) {
-      console.error('Error fetching submissions:', error);
+      console.error('Error fetching Facebook submissions:', error);
       setMessage('Error loading submissions');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,28 +54,26 @@ const FacebookComponent = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.video_url.trim()) {
+      setMessage('Please enter a video URL');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/api/content/', 
-        {
-          ...formData,
-          platform: 'facebook'
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      await contentAPI.submitContent({
+        ...formData,
+        platform: 'facebook'
+      });
       
       setMessage('Facebook video submitted successfully! It will be reviewed shortly.');
       setFormData({ video_url: '', description: '' });
-      fetchSubmissions();
-      fetchUserData();
+      await fetchSubmissions();
     } catch (error) {
-      console.error('Error submitting content:', error);
-      setMessage(error.response?.data?.error || 'Error submitting video. Please try again.');
+      console.error('Error submitting Facebook video:', error);
+      setMessage(error.message || 'Error submitting video. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -195,7 +170,12 @@ const FacebookComponent = () => {
       <div className="submissions-list">
         <h3>Your Facebook Submissions</h3>
         
-        {submissions.length === 0 ? (
+        {loading ? (
+          <div className="loading-state">
+            <i className="fas fa-spinner fa-spin"></i>
+            <p>Loading submissions...</p>
+          </div>
+        ) : submissions.length === 0 ? (
           <div className="empty-state">
             <i className="fas fa-video"></i>
             <p>You haven't submitted any Facebook videos yet</p>

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { platformAPI, dashboardAPI } from '../services/apiService';
+import { platformAPI, contentAPI } from '../services/apiService';
 import '../styles/PlatformComponent.css';
 
 const TikTokComponent = () => {
-  const [balance, setBalance] = useState(0);
   const [formData, setFormData] = useState({
     video_url: '',
     description: ''
@@ -18,42 +17,32 @@ const TikTokComponent = () => {
   });
 
   useEffect(() => {
-    fetchUserData();
     fetchSubmissions();
   }, []);
 
-  const fetchUserData = async () => {
+  const fetchSubmissions = async () => {
     try {
-      const dashboardData = await dashboardAPI.getDashboardData();
-      setBalance(dashboardData.wallet_balance);
+      setLoading(true);
+      // Use contentAPI instead of platformAPI for better compatibility
+      const allSubmissions = await contentAPI.getSubmissions();
+      const tiktokSubmissions = allSubmissions.filter(sub => sub.platform === 'tiktok');
+      setSubmissions(tiktokSubmissions);
       
-      // Calculate TikTok-specific stats
-      const tiktokSubmissions = dashboardData.recent_submissions.filter(
-        sub => sub.platform === 'tiktok'
-      );
+      // Calculate stats
       const approved = tiktokSubmissions.filter(sub => sub.status === 'approved');
       const pending = tiktokSubmissions.filter(sub => sub.status === 'pending');
-      
-      const tiktokEarnings = approved.reduce((sum, sub) => sum + parseFloat(sub.earnings), 0);
+      const totalEarnings = approved.reduce((sum, sub) => sum + parseFloat(sub.earnings || 0), 0);
       
       setStats({
-        totalEarnings: tiktokEarnings,
+        totalEarnings,
         approvedSubmissions: approved.length,
         pendingSubmissions: pending.length
       });
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      setMessage('Error loading data');
-    }
-  };
-
-  const fetchSubmissions = async () => {
-    try {
-      const tiktokSubmissions = await platformAPI.tiktok.getSubmissions();
-      setSubmissions(tiktokSubmissions);
-    } catch (error) {
-      console.error('Error fetching submissions:', error);
+      console.error('Error fetching TikTok submissions:', error);
       setMessage('Error loading submissions');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -66,18 +55,27 @@ const TikTokComponent = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.video_url.trim()) {
+      setMessage('Please enter a video URL');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     
     try {
-      await platformAPI.tiktok.submitVideo(formData);
+      // Use contentAPI directly with platform parameter
+      await contentAPI.submitContent({
+        ...formData,
+        platform: 'tiktok'
+      });
+      
       setMessage('TikTok video submitted successfully! It will be reviewed shortly.');
       setFormData({ video_url: '', description: '' });
-      fetchSubmissions();
-      fetchUserData();
+      await fetchSubmissions(); // Refresh the list
     } catch (error) {
-      console.error('Error submitting content:', error);
-      setMessage(error.response?.data?.error || 'Error submitting video. Please try again.');
+      console.error('Error submitting TikTok video:', error);
+      setMessage(error.message || 'Error submitting video. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -178,7 +176,12 @@ const TikTokComponent = () => {
       <div className="submissions-list">
         <h3>Your TikTok Submissions</h3>
         
-        {submissions.length === 0 ? (
+        {loading ? (
+          <div className="loading-state">
+            <i className="fas fa-spinner fa-spin"></i>
+            <p>Loading submissions...</p>
+          </div>
+        ) : submissions.length === 0 ? (
           <div className="empty-state">
             <i className="fas fa-video"></i>
             <p>You haven't submitted any TikTok videos yet</p>
