@@ -62,6 +62,57 @@ const Dashboard = ({ user }) => {
     navigate('/login');
   };
 
+  // Calculate total balance from all sources
+  const calculateTotalBalance = (data) => {
+    if (!data) return 0;
+    
+    const { earnings_breakdown = {}, referral_stats = {} } = data;
+    
+    // Sum all earnings sources
+    const contentEarnings = earnings_breakdown.content || 0;
+    const referralEarnings = referral_stats.total_earned || 0;
+    const gameEarnings = earnings_breakdown.games || 0;
+    const dailyLoginEarnings = earnings_breakdown.daily_login || 0;
+    
+    // Calculate platform-specific earnings from submissions
+    const platformEarnings = calculatePlatformEarnings(data.recent_submissions);
+    const totalPlatformEarnings = platformEarnings.tiktok + platformEarnings.instagram + platformEarnings.facebook;
+    
+    // Total balance is sum of all earnings sources
+    const totalBalance = contentEarnings + referralEarnings + gameEarnings + dailyLoginEarnings;
+    
+    console.log('💰 Earnings Breakdown:', {
+      content: contentEarnings,
+      referral: referralEarnings,
+      games: gameEarnings,
+      dailyLogin: dailyLoginEarnings,
+      platforms: totalPlatformEarnings,
+      total: totalBalance
+    });
+    
+    return totalBalance;
+  };
+
+  // Calculate platform-specific earnings from submissions
+  const calculatePlatformEarnings = (submissions = []) => {
+    const platformEarnings = {
+      tiktok: 0,
+      instagram: 0,
+      facebook: 0
+    };
+
+    submissions.forEach(submission => {
+      if ((submission.status === 'approved' || submission.status === 'paid') && submission.earnings) {
+        const platform = submission.platform?.toLowerCase();
+        if (platform in platformEarnings) {
+          platformEarnings[platform] += parseFloat(submission.earnings) || 0;
+        }
+      }
+    });
+
+    return platformEarnings;
+  };
+
   if (loading) {
     return (
       <div className="dashboard-loading">
@@ -104,13 +155,38 @@ const Dashboard = ({ user }) => {
     submission_count: 0,
     referral_count: 0,
     recent_transactions: [],
-    referral_stats: { total_referrals: 0, total_earned: 0 }
+    recent_submissions: [],
+    referral_stats: { total_referrals: 0, total_earned: 0 },
+    earnings_breakdown: {
+      content: 0,
+      referrals: 0,
+      games: 0,
+      daily_login: 0
+    }
   };
 
   const packageTier = getUserPackageTier(user);
   const userFeatures = getPackageFeatures(packageTier);
-  const { recent_transactions, referral_stats } = safeData;
-  const stats = getSafeStats(safeData);
+  const { recent_transactions, referral_stats, earnings_breakdown, recent_submissions } = safeData;
+  
+  // Calculate total balance from all sources
+  const totalBalance = calculateTotalBalance(safeData);
+  
+  // Calculate platform-specific earnings
+  const platformEarnings = calculatePlatformEarnings(recent_submissions);
+  
+  // Create stats object with calculated values
+  const stats = {
+    totalEarnings: totalBalance,
+    tiktokEarnings: platformEarnings.tiktok,
+    instagramEarnings: platformEarnings.instagram,
+    facebookEarnings: platformEarnings.facebook,
+    totalReferrals: referral_stats?.total_referrals || 0,
+    referralEarnings: referral_stats?.total_earned || 0,
+    gameEarnings: earnings_breakdown?.games || 0,
+    dailyLoginEarnings: earnings_breakdown?.daily_login || 0,
+    contentEarnings: earnings_breakdown?.content || 0
+  };
 
   return (
     <div className="dashboard">
@@ -133,7 +209,21 @@ const Dashboard = ({ user }) => {
           </h1>
           <p>Package: {userFeatures.label} - Enjoy your exclusive benefits!</p>
         </div>
-      
+        
+        <div className="wallet-overview">
+          <div className="wallet-balance">
+            <h2>Total Balance</h2>
+            <div className="balance-amount">{formatCurrency(totalBalance)}</div>
+            <div className="balance-breakdown">
+              <small>
+                Content: {formatCurrency(stats.contentEarnings)} • 
+                Referrals: {formatCurrency(stats.referralEarnings)} • 
+                Games: {formatCurrency(stats.gameEarnings)} • 
+                Daily Login: {formatCurrency(stats.dailyLoginEarnings)}
+              </small>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className='board'>
@@ -145,7 +235,10 @@ const Dashboard = ({ user }) => {
         <div className="main-stat-card">
           <div className="main-stat-info">
             <p>Total Balance</p>
-            <h3>{NAIRA_SIGN}{stats.totalEarnings.toFixed(2)}</h3>
+            <h3>{NAIRA_SIGN}{totalBalance.toFixed(2)}</h3>
+            <div className="balance-sources">
+              <span>All Earnings Combined</span>
+            </div>
           </div>
         </div>
 
@@ -158,6 +251,7 @@ const Dashboard = ({ user }) => {
               <div className="stat-info">
                 <h3>{NAIRA_SIGN}{stats.tiktokEarnings.toFixed(2)}</h3>
                 <p>TikTok Balance {'>'}</p>
+                <small>From {recent_submissions?.filter(s => s.platform === 'tiktok' && (s.status === 'approved' || s.status === 'paid')).length || 0} videos</small>
               </div>
             </div>
           </Link>
@@ -170,6 +264,7 @@ const Dashboard = ({ user }) => {
               <div className="stat-info">
                 <h3>{NAIRA_SIGN}{stats.instagramEarnings.toFixed(2)}</h3>
                 <p>Instagram Balance {'>'}</p>
+                <small>From {recent_submissions?.filter(s => s.platform === 'instagram' && (s.status === 'approved' || s.status === 'paid')).length || 0} videos</small>
               </div>
             </div>
           </Link>
@@ -182,6 +277,7 @@ const Dashboard = ({ user }) => {
               <div className="stat-info">
                 <h3>{NAIRA_SIGN}{stats.facebookEarnings.toFixed(2)}</h3>
                 <p>FaceBook Balance {'>'}</p>
+                <small>From {recent_submissions?.filter(s => s.platform === 'facebook' && (s.status === 'approved' || s.status === 'paid')).length || 0} videos</small>
               </div>
             </div>
           </Link>
@@ -195,6 +291,7 @@ const Dashboard = ({ user }) => {
               <i className="fas fa-money-bill-wave"></i>
             </div>
             <h3>Withdrawal</h3>
+            <small>Available: {formatCurrency(totalBalance)}</small>
           </div>
         </Link>
         
@@ -206,6 +303,7 @@ const Dashboard = ({ user }) => {
             <div className='act-info'>
               <h3>Referral</h3>
               <p>{NAIRA_SIGN}{stats.referralEarnings.toFixed(2)} {'>'}</p>
+              <small>{stats.totalReferrals} referrals</small>
             </div>
           </div>
         </Link> 
@@ -218,6 +316,20 @@ const Dashboard = ({ user }) => {
             <div className='act-info'>
               <h3>Games</h3>
               <p>{NAIRA_SIGN}{stats.gameEarnings.toFixed(2)} {'>'}</p>
+              <small>Daily rewards</small>
+            </div>
+          </div>
+        </Link>
+        
+        <Link to="/daily-login" className='link-properties'>
+          <div className='act-card'>
+            <div className='act-icon'>
+              <i className="fas fa-sign-in-alt"></i>
+            </div>
+            <div className='act-info'>
+              <h3>Daily Login</h3>
+              <p>{NAIRA_SIGN}{stats.dailyLoginEarnings.toFixed(2)} {'>'}</p>
+              <small>Bonus earnings</small>
             </div>
           </div>
         </Link>
@@ -263,6 +375,48 @@ const Dashboard = ({ user }) => {
           <p className="referral-note">
             Earn {formatCurrency(userFeatures.referralBonus)} for each friend you refer!
           </p>
+        </div>
+      </div>
+
+      <div className="earnings-summary">
+        <h3>Earnings Summary</h3>
+        <div className="earnings-breakdown">
+          <div className="earnings-category">
+            <div className="category-icon">
+              <i className="fas fa-video"></i>
+            </div>
+            <div className="category-info">
+              <h4>Content Earnings</h4>
+              <p>{formatCurrency(stats.contentEarnings)}</p>
+            </div>
+          </div>
+          <div className="earnings-category">
+            <div className="category-icon">
+              <i className="fas fa-users"></i>
+            </div>
+            <div className="category-info">
+              <h4>Referral Earnings</h4>
+              <p>{formatCurrency(stats.referralEarnings)}</p>
+            </div>
+          </div>
+          <div className="earnings-category">
+            <div className="category-icon">
+              <i className="fas fa-gamepad"></i>
+            </div>
+            <div className="category-info">
+              <h4>Game Earnings</h4>
+              <p>{formatCurrency(stats.gameEarnings)}</p>
+            </div>
+          </div>
+          <div className="earnings-category">
+            <div className="category-icon">
+              <i className="fas fa-sign-in-alt"></i>
+            </div>
+            <div className="category-info">
+              <h4>Daily Login</h4>
+              <p>{formatCurrency(stats.dailyLoginEarnings)}</p>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,5 @@
 import { API_BASE_URL } from '../config/environment';
-import { authAPI } from './authService'; // Import authAPI instead of getToken
-
+import { authAPI } from './authService';
 
 // Generic API request function
 const apiRequest = async (endpoint, options = {}) => {
@@ -8,7 +7,7 @@ const apiRequest = async (endpoint, options = {}) => {
   
   const defaultHeaders = {
     'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Token ${token}` }),
+    ...(token && { 'Authorization': `Bearer ${token}` }), // Changed from Token to Bearer
     ...options.headers
   };
 
@@ -28,7 +27,7 @@ const apiRequest = async (endpoint, options = {}) => {
     // Handle unauthorized/forbidden (token expired or invalid)
     if (response.status === 401 || response.status === 403) {
       console.log('🔐 Authentication failed, clearing token...');
-      authAPI.clearAuth(); // Use the new method
+      authAPI.logout(); // Use logout instead of clearAuth
       throw new Error('Authentication failed. Please login again.');
     }
     
@@ -66,74 +65,104 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
-export const dashboardAPI = {
-  getDashboardData: () => apiRequest('/api/dashboard/'),
-  getEarningsBreakdown: () => apiRequest('/api/dashboard/earnings/'),
-  getRecentActivity: () => apiRequest('/api/dashboard/activity/')
+// Add token refresh logic
+const apiRequestWithRefresh = async (endpoint, options = {}) => {
+  try {
+    return await apiRequest(endpoint, options);
+  } catch (error) {
+    if (error.message.includes('Authentication failed')) {
+      // Try to refresh token once
+      try {
+        await authAPI.refreshToken();
+        return await apiRequest(endpoint, options);
+      } catch (refreshError) {
+        authAPI.logout();
+        throw new Error('Session expired. Please login again.');
+      }
+    }
+    throw error;
+  }
 };
 
-// Packages API
+export const dashboardAPI = {
+  getDashboardData: () => apiRequestWithRefresh('/api/dashboard/'),
+  getEarningsBreakdown: () => apiRequestWithRefresh('/api/dashboard/earnings/'),
+  getRecentActivity: () => apiRequestWithRefresh('/api/dashboard/activity/')
+};
+
+// Content Submission API - Use apiRequestWithRefresh for authenticated endpoints
+export const contentAPI = {
+  getSubmissions: () => apiRequestWithRefresh('/api/content/'),
+  submitContent: (data) => 
+    apiRequestWithRefresh('/api/content/', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+  updateSubmission: (submissionId, data) =>
+    apiRequestWithRefresh(`/api/content/${submissionId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+  deleteSubmission: (submissionId) =>
+    apiRequestWithRefresh(`/api/content/${submissionId}/`, {
+      method: 'DELETE'
+    })
+};
+
+// Games API - Use apiRequestWithRefresh
+// services/apiService.js
+export const gamesAPI = {
+  // Play game
+  playGame: async (gameType) => {
+    return await apiRequest('/api/games/play/', {
+      method: 'POST',
+      body: { game_type: gameType },
+    });
+  },
+
+  // Claim daily login bonus
+  claimDailyLogin: async () => {
+    return await apiRequest('/api/daily-login/', {
+      method: 'POST',
+    });
+  },
+
+  // Get game history
+  getGameHistory: async () => {
+    return await apiRequest('/api/games/history/', {
+      method: 'GET',
+    });
+  }
+};
+// Referrals API - Use apiRequestWithRefresh
+export const referralsAPI = {
+  getReferrals: () => apiRequestWithRefresh('/api/referrals/'),
+  getReferralStats: () => apiRequestWithRefresh('/api/referrals/stats/')
+};
+
+// Other APIs remain the same...
 export const packagesAPI = {
   getAllPackages: () => apiRequest('/api/packages/'),
   getPackageDetails: (packageId) => apiRequest(`/api/packages/${packageId}/`)
 };
 
-// Content Submission API
-export const contentAPI = {
-  getSubmissions: () => apiRequest('/api/content/'),
-  submitContent: (data) => 
-    apiRequest('/api/content/', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-  updateSubmission: (submissionId, data) =>
-    apiRequest(`/api/content/${submissionId}/`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-  deleteSubmission: (submissionId) =>
-    apiRequest(`/api/content/${submissionId}/`, {
-      method: 'DELETE'
-    })
-};
-
-// Referrals API
-export const referralsAPI = {
-  getReferrals: () => apiRequest('/api/referrals/'),
-  getReferralStats: () => apiRequest('/api/referrals/stats/')
-};
-
-// Games API
-export const gamesAPI = {
-  playGame: (gameType) =>
-    apiRequest('/api/games/play/', {
-      method: 'POST',
-      body: JSON.stringify({ game_type: gameType })
-    }),
-  getGameHistory: () => apiRequest('/api/games/history/'),
-  claimDailyLogin: () =>
-    apiRequest('/api/daily-login/', {
-      method: 'POST'
-    })
-};
-
 // Wallet & Transactions API
 export const walletAPI = {
-  getBalance: () => apiRequest('/api/wallet/balance/'),
-  getTransactions: () => apiRequest('/api/transactions/'),
+  getBalance: () => apiRequestWithRefresh('/api/wallet/balance/'),
+  getTransactions: () => apiRequestWithRefresh('/api/transactions/'),
   requestWithdrawal: (withdrawalData) =>
-    apiRequest('/api/withdrawals/', {
+    apiRequestWithRefresh('/api/withdrawals/', {
       method: 'POST',
       body: JSON.stringify(withdrawalData)
     }),
-  getWithdrawalHistory: () => apiRequest('/api/withdrawals/')
+  getWithdrawalHistory: () => apiRequestWithRefresh('/api/withdrawals/')
 };
 
 // User Profile API
 export const profileAPI = {
-  getProfile: () => apiRequest('/api/profile/'),
+  getProfile: () => apiRequestWithRefresh('/api/profile/'),
   updateProfile: (profileData) =>
-    apiRequest('/api/profile/', {
+    apiRequestWithRefresh('/api/profile/', {
       method: 'PUT',
       body: JSON.stringify(profileData)
     })
@@ -141,7 +170,6 @@ export const profileAPI = {
 
 // Platform-specific APIs
 export const platformAPI = {
-  // TikTok specific
   tiktok: {
     getSubmissions: () => contentAPI.getSubmissions().then(submissions => 
       submissions.filter(sub => sub.platform === 'tiktok')
@@ -150,7 +178,6 @@ export const platformAPI = {
       contentAPI.submitContent({ ...videoData, platform: 'tiktok' })
   },
   
-  // Instagram specific
   instagram: {
     getSubmissions: () => contentAPI.getSubmissions().then(submissions => 
       submissions.filter(sub => sub.platform === 'instagram')
@@ -159,7 +186,6 @@ export const platformAPI = {
       contentAPI.submitContent({ ...videoData, platform: 'instagram' })
   },
   
-  // Facebook specific
   facebook: {
     getSubmissions: () => contentAPI.getSubmissions().then(submissions => 
       submissions.filter(sub => sub.platform === 'facebook')
@@ -169,11 +195,11 @@ export const platformAPI = {
   }
 };
 
-export { apiRequest };
+export { apiRequest, apiRequestWithRefresh };
 
-// Create named export object to fix ESLint warning
 const apiServices = {
   apiRequest,
+  apiRequestWithRefresh,
   dashboard: dashboardAPI,
   packages: packagesAPI,
   content: contentAPI,
@@ -184,5 +210,4 @@ const apiServices = {
   platform: platformAPI
 };
 
-// Export all APIs
 export default apiServices;
