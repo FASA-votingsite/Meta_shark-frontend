@@ -110,36 +110,37 @@ export const contentAPI = {
 };
 
 // Games API - Use apiRequestWithRefresh
-// services/apiService.js
+// In your apiService.js, update the gamesAPI section:
 export const gamesAPI = {
-  // Play game
-  playGame: async (gameType) => {
-    return await apiRequest('/api/games/play/', {
+  playGame: (gameType) =>
+    apiRequestWithRefresh('/api/games/play/', {
       method: 'POST',
-      body: { game_type: gameType },
-    });
-  },
-
-  // Claim daily login bonus
-  claimDailyLogin: async () => {
-    return await apiRequest('/api/daily-login/', {
-      method: 'POST',
-    });
-  },
-
-  // Get game history
-  getGameHistory: async () => {
-    return await apiRequest('/api/games/history/', {
-      method: 'GET',
-    });
-  }
+      body: JSON.stringify({ game_type: gameType })
+    }),
+  
+  getGameHistory: () => 
+    apiRequestWithRefresh('/api/games/history/', {
+      method: 'GET'
+    }),
+  
+  claimDailyLogin: () =>
+    apiRequestWithRefresh('/api/daily-login/', {
+      method: 'POST'
+    })
 };
-// Referrals API - Use apiRequestWithRefresh
+
+// Referrals API
 export const referralsAPI = {
-  getReferrals: () => apiRequestWithRefresh('/api/referrals/'),
-  getReferralStats: () => apiRequestWithRefresh('/api/referrals/stats/')
+  getReferrals: () => 
+    apiRequestWithRefresh('/api/referrals/', {
+      method: 'GET'
+    }),
+  
+  getReferralStats: () =>
+    apiRequestWithRefresh('/api/referrals/stats/', {
+      method: 'GET'
+    })
 };
-
 // Other APIs remain the same...
 export const packagesAPI = {
   getAllPackages: () => apiRequest('/api/packages/'),

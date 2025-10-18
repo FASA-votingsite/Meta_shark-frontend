@@ -5,7 +5,6 @@
   position: fixed;
   bottom: 0;
   z-index: 1000;
-  max-width: 1200px;
 }
 
 .butbar-container {

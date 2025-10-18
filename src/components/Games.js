@@ -7,8 +7,7 @@ const Games = () => {
   const [loadingStates, setLoadingStates] = useState({
     daily_spin: false,
     scratch_card: false,
-    quiz: false,
-    daily_login: false
+    quiz: false
   });
   const [error, setError] = useState('');
   const [gameHistory, setGameHistory] = useState([]);
@@ -42,21 +41,6 @@ const Games = () => {
     }
   };
 
-  const claimDailyLogin = async () => {
-    setLoadingStates(prev => ({ ...prev, daily_login: true }));
-    setError('');
-
-    try {
-      const result = await gamesAPI.claimDailyLogin();
-      setGameResults(prev => ({ ...prev, daily_login: result }));
-      await fetchGameHistory(); // Refresh history
-    } catch (error) {
-      setError(error.message || 'Failed to claim daily login bonus.');
-    } finally {
-      setLoadingStates(prev => ({ ...prev, daily_login: false }));
-    }
-  };
-
   const getGameResult = (gameType) => {
     return gameResults[gameType];
   };
@@ -64,33 +48,49 @@ const Games = () => {
   return (
     <div className="games">
       <div className="games-header">
-        <h1>Daily Games & Rewards</h1>
-        <p>Play daily games to earn extra rewards</p>
+        <h1>🎮 Daily Games</h1>
+        <p>Play exciting games daily to earn extra rewards!</p>
       </div>
 
-      {error && <div className="game-error">{error}</div>}
+      {error && (
+        <div className="game-error">
+          <i className="fas fa-exclamation-circle"></i>
+          {error}
+        </div>
+      )}
 
       <div className="games-grid">
         {/* Daily Spin */}
         <div className="game-card">
-          <div className="game-icon">
+          <div className="game-icon spin-icon">
             <i className="fas fa-compact-disc"></i>
           </div>
-          <h3>Daily Spin</h3>
-          <p>Spin the wheel to win up to ₦1,000</p>
+          <h3>Daily Spin Wheel</h3>
+          <p>Spin to win up to ₦1,000 in rewards</p>
+          <div className="game-reward-range">
+            <small>Reward: ₦200 - ₦1,000</small>
+          </div>
           <button 
             onClick={() => playGame('daily_spin')} 
             disabled={loadingStates.daily_spin}
-            className="game-button"
+            className={`game-button ${loadingStates.daily_spin ? 'loading' : ''}`}
           >
-            {loadingStates.daily_spin ? 'Spinning...' : 'Spin Now'}
+            {loadingStates.daily_spin ? (
+              <>
+                <i className="fas fa-spinner fa-spin"></i> Spinning...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-play"></i> Spin Now
+              </>
+            )}
           </button>
           {getGameResult('daily_spin') && (
             <div className="game-result-mini">
               {getGameResult('daily_spin').reward > 0 ? (
-                <span className="win">+₦{getGameResult('daily_spin').reward}</span>
+                <span className="win">🎉 +₦{getGameResult('daily_spin').reward}</span>
               ) : (
-                <span className="lose">Try again!</span>
+                <span className="lose">😔 Try again tomorrow!</span>
               )}
             </div>
           )}
@@ -98,24 +98,35 @@ const Games = () => {
 
         {/* Scratch Card */}
         <div className="game-card">
-          <div className="game-icon">
+          <div className="game-icon scratch-icon">
             <i className="fas fa-ticket-alt"></i>
           </div>
           <h3>Scratch Card</h3>
-          <p>Reveal your prize by scratching the card</p>
+          <p>Reveal hidden prizes by scratching the card</p>
+          <div className="game-reward-range">
+            <small>Reward: ₦150 - ₦800</small>
+          </div>
           <button 
             onClick={() => playGame('scratch_card')} 
             disabled={loadingStates.scratch_card}
-            className="game-button"
+            className={`game-button ${loadingStates.scratch_card ? 'loading' : ''}`}
           >
-            {loadingStates.scratch_card ? 'Scratching...' : 'Scratch Now'}
+            {loadingStates.scratch_card ? (
+              <>
+                <i className="fas fa-spinner fa-spin"></i> Scratching...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-play"></i> Scratch Now
+              </>
+            )}
           </button>
           {getGameResult('scratch_card') && (
             <div className="game-result-mini">
               {getGameResult('scratch_card').reward > 0 ? (
-                <span className="win">+₦{getGameResult('scratch_card').reward}</span>
+                <span className="win">🎉 +₦{getGameResult('scratch_card').reward}</span>
               ) : (
-                <span className="lose">Try again!</span>
+                <span className="lose">😔 Try again tomorrow!</span>
               )}
             </div>
           )}
@@ -123,49 +134,35 @@ const Games = () => {
 
         {/* Daily Quiz */}
         <div className="game-card">
-          <div className="game-icon">
+          <div className="game-icon quiz-icon">
             <i className="fas fa-puzzle-piece"></i>
           </div>
           <h3>Daily Quiz</h3>
-          <p>Answer questions to earn rewards</p>
+          <p>Answer fun questions to earn instant rewards</p>
+          <div className="game-reward-range">
+            <small>Reward: ₦100 - ₦500</small>
+          </div>
           <button 
             onClick={() => playGame('quiz')} 
             disabled={loadingStates.quiz}
-            className="game-button"
+            className={`game-button ${loadingStates.quiz ? 'loading' : ''}`}
           >
-            {loadingStates.quiz ? 'Loading...' : 'Play Now'}
+            {loadingStates.quiz ? (
+              <>
+                <i className="fas fa-spinner fa-spin"></i> Loading...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-play"></i> Start Quiz
+              </>
+            )}
           </button>
           {getGameResult('quiz') && (
             <div className="game-result-mini">
               {getGameResult('quiz').reward > 0 ? (
-                <span className="win">+₦{getGameResult('quiz').reward}</span>
+                <span className="win">🎉 +₦{getGameResult('quiz').reward}</span>
               ) : (
-                <span className="lose">Try again!</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Daily Login */}
-        <div className="game-card">
-          <div className="game-icon">
-            <i className="fas fa-sign-in-alt"></i>
-          </div>
-          <h3>Daily Login</h3>
-          <p>Claim your daily login bonus</p>
-          <button 
-            onClick={claimDailyLogin} 
-            disabled={loadingStates.daily_login}
-            className="game-button login"
-          >
-            {loadingStates.daily_login ? 'Claiming...' : 'Claim Bonus'}
-          </button>
-          {getGameResult('daily_login') && (
-            <div className="game-result-mini">
-              {getGameResult('daily_login').bonus_amount > 0 ? (
-                <span className="win">+₦{getGameResult('daily_login').bonus_amount}</span>
-              ) : (
-                <span className="lose">Already claimed!</span>
+                <span className="lose">😔 Try again tomorrow!</span>
               )}
             </div>
           )}
@@ -177,24 +174,33 @@ const Games = () => {
         result && (
           <div key={gameType} className="game-result-individual">
             <h3>{getGameName(gameType)} Result</h3>
-            <div className={`result-box ${result.reward > 0 || result.bonus_amount > 0 ? 'win' : 'lose'}`}>
-              <i className={`fas ${(result.reward > 0 || result.bonus_amount > 0) ? 'fa-trophy' : 'fa-times-circle'}`}></i>
+            <div className={`result-box ${result.reward > 0 ? 'win' : 'lose'}`}>
+              <i className={`fas ${result.reward > 0 ? 'fa-trophy' : 'fa-times-circle'}`}></i>
               <h3>
-                {(result.reward > 0 || result.bonus_amount > 0) 
-                  ? `You won ₦${(result.reward || result.bonus_amount).toLocaleString()}!` 
+                {result.reward > 0 
+                  ? `You won ₦${result.reward.toLocaleString()}!` 
                   : 'Try again tomorrow!'
                 }
               </h3>
               <p>{result.message || 'Come back tomorrow for another chance!'}</p>
+              {result.reward > 0 && (
+                <div className="celebration">
+                  🎉 Congratulations! 🎉
+                </div>
+              )}
             </div>
           </div>
         )
       ))}
 
       <div className="game-history">
-        <h2>Recent Game History</h2>
+        <h2>📊 Recent Game History</h2>
         {gameHistory.length === 0 ? (
-          <p className="no-history">No game history yet</p>
+          <div className="no-history">
+            <i className="fas fa-gamepad"></i>
+            <p>No game history yet</p>
+            <small>Play your first game to start earning!</small>
+          </div>
         ) : (
           <div className="history-list">
             {gameHistory.slice(0, 10).map(game => (
@@ -213,6 +219,33 @@ const Games = () => {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="games-info">
+        <h3>ℹ️ Game Rules</h3>
+        <div className="rules-grid">
+          <div className="rule-item">
+            <i className="fas fa-sync-alt"></i>
+            <div>
+              <strong>Daily Limit</strong>
+              <p>You can play each game once per day</p>
+            </div>
+          </div>
+          <div className="rule-item">
+            <i className="fas fa-clock"></i>
+            <div>
+              <strong>Reset Time</strong>
+              <p>Games reset at midnight (00:00)</p>
+            </div>
+          </div>
+          <div className="rule-item">
+            <i className="fas fa-gift"></i>
+            <div>
+              <strong>Instant Rewards</strong>
+              <p>Earnings are added to your wallet immediately</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ const ButBar = ({ user, onLogout }) => {
         <div className="butbar-menu">
           <Link to="/dashboard" className="butbar-item">Home</Link>
           <Link to="/referrals" className="butbar-item">Referrals</Link>
-          <Link to="/submit-content" className="butbar-item">Submit</Link>
+          {/*<Link to="/submit-content" className="butbar-item">Submit</Link>*/}
           <Link to="/games" className="butbar-item">Games</Link>
           <Link to="/withdrawal" className="butbar-item">More</Link>
         </div>

@@ -15,6 +15,8 @@ import Games from './components/Games';
 import Withdrawal from './components/Withdrawal';
 import ButBar from './components/ButBar';
 import ContentSubmission from './components/ContentSubmission';
+import DailyLogin from './components/DailyLogin';
+
 
 // Import CSS
 import './styles/App.css';
@@ -67,6 +69,7 @@ function App() {
     <Router>
       <div className="App">
         {user && <Navbar user={user} onLogout={handleLogout} />}
+        {user && <ButBar user={user} onLogout={handleLogout} />}
         
         <Routes>
           {!user ? (
@@ -85,6 +88,7 @@ function App() {
               <Route path="/games" element={<Games />} />
               <Route path="/withdrawal" element={<Withdrawal user={user} />} />
               <Route path="/submit-content" element={<ContentSubmission />} />
+              <Route path="/daily-login" element={<DailyLogin />} />
               <Route path="*" element={<Navigate to="/dashboard" />} />
             </>
           )}

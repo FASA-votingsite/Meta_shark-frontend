@@ -249,6 +249,10 @@
   text-decoration: none;
 }
 
+.referral-statss p {
+  color: white;
+}
+
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: repeat(auto-fit, minmax(250px, 3fr));
