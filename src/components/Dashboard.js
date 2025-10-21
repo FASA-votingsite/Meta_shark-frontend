@@ -195,77 +195,73 @@ const Dashboard = ({ user }) => {
         </div>
       )}
 
-      {/* Row 1: Welcome and Package Badge - Left Side */}
-      <div className="dashboard-row welcome-row">
-        <div className="user-welcome">
-          <h1>
-            Welcome, {user?.username || 'User'} 
-            <PackageBadge tier={packageTier} />
-          </h1>
-          <p>Package: {userFeatures.label} - Enjoy your exclusive benefits!</p>
-        </div>
-      </div>
-
-      {/* Row 2: META_SHARK Brand with Platform Balances */}
-      <div className="dashboard-row brand-platforms-row">
-        <div className="board">
-          {/* META_SHARK Brand - Center */}
+      {/* Combined Header, Brand, and Platform Cards inside Total Balance Area */}
+      <div className="board combined-layout">
+        {/* Header Section */}
+        <div className="combined-header">
+          <div className="user-welcome">
+            <h1>
+              Welcome, {user?.username || 'User'} 
+              <PackageBadge tier={packageTier} />
+            </h1>
+            <p>Package: {userFeatures.label}</p>
+          </div>
           <div className="meta-layout">
             <img src="/logo192.png" alt="META_SHARK" />
             <span className="brand-text">META_SHARK</span>
           </div>
+        </div>
 
-          {/* Total Balance */}
-          <div className="main-stat-card">
-            <div className="main-stat-info">
-              <p>Total Balance</p>
-              <h3>{NAIRA_SIGN}{totalBalance.toFixed(2)}</h3>
+        {/* Total Balance */}
+        <div className="main-stat-card">
+          <div className="main-stat-info">
+            <p>Total Balance</p>
+            <h3>{NAIRA_SIGN}{totalBalance.toFixed(2)}</h3>
+          </div>
+        </div>
+
+        {/* Platform Balances Row */}
+        <div className="platforms-row">
+          <Link to='/tiktok' className='link-properties'>
+            <div className="stat-card">
+              <div className="stat-icon">
+                <i className="fab fa-tiktok"></i>
+              </div>
+              <div className="stat-info">
+                <h3>{NAIRA_SIGN}{stats.tiktokEarnings.toFixed(2)}</h3>
+                <p>TikTok Balance {'>'}</p>
+              </div>
             </div>
-          </div>
+          </Link>
 
-          {/* Platform Balances Row */}
-          <div className="platforms-row">
-            <Link to='/tiktok' className='link-properties'>
-              <div className="stat-card">
-                <div className="stat-icon">
-                  <i className="fab fa-tiktok"></i>
-                </div>
-                <div className="stat-info">
-                  <h3>{NAIRA_SIGN}{stats.tiktokEarnings.toFixed(2)}</h3>
-                  <p>TikTok Balance {'>'}</p>
-                </div>
+          <Link to='/instagram' className='link-properties'>
+            <div className="stat-card">
+              <div className="stat-icon">
+                <i className="fab fa-instagram"></i>
               </div>
-            </Link>
+              <div className="stat-info">
+                <h3>{NAIRA_SIGN}{stats.instagramEarnings.toFixed(2)}</h3>
+                <p>Instagram Balance {'>'}</p>
+              </div>
+            </div>
+          </Link>
 
-            <Link to='/instagram' className='link-properties'>
-              <div className="stat-card">
-                <div className="stat-icon">
-                  <i className="fab fa-instagram"></i>
-                </div>
-                <div className="stat-info">
-                  <h3>{NAIRA_SIGN}{stats.instagramEarnings.toFixed(2)}</h3>
-                  <p>Instagram Balance {'>'}</p>
-                </div>
+          <Link to='/facebook' className='link-properties'>
+            <div className="stat-card">
+              <div className="stat-icon">
+                <i className="fab fa-facebook-f"></i>
               </div>
-            </Link>
-
-            <Link to='/facebook' className='link-properties'>
-              <div className="stat-card">
-                <div className="stat-icon">
-                  <i className="fab fa-facebook-f"></i>
-                </div>
-                <div className="stat-info">
-                  <h3>{NAIRA_SIGN}{stats.facebookEarnings.toFixed(2)}</h3>
-                  <p>Facebook Balance {'>'}</p>
-                </div>
+              <div className="stat-info">
+                <h3>{NAIRA_SIGN}{stats.facebookEarnings.toFixed(2)}</h3>
+                <p>Facebook Balance {'>'}</p>
               </div>
-            </Link>
-          </div>
+            </div>
+          </Link>
         </div>
       </div>
 
-      {/* Row 3: Actions Row */}
-      <div className="dashboard-row actions-row">
+      {/* Actions Row */}
+      <div className="actions-row">
         <div className='act-list'>
           <Link to='/withdrawal' className='link-properties'>
             <div className='act-card'>
@@ -318,44 +314,41 @@ const Dashboard = ({ user }) => {
         </div>
       </div>
 
-      {/* Row 4: Content Row */}
-      <div className="dashboard-row content-row">
-        <div className="dashboard-grid">
-          <div className="recent-activity">
-            <h3>Recent Activity</h3>
-            {(!recent_transactions || recent_transactions.length === 0) ? (
-              <p className="no-activity">No recent activity</p>
-            ) : (
-              <div className="activity-list">
-                {recent_transactions.slice(0, 5).map(transaction => (
-                  <div key={transaction.id} className="activity-item">
-                    <div className="activity-icon">
-                      <i className={`fas ${getTransactionIcon(transaction.transaction_type)}`}></i>
-                    </div>
-                    <div className="activity-details">
-                      <p>{transaction.description}</p>
-                      <span>{new Date(transaction.date).toLocaleDateString()}</span>
-                    </div>
-                    <div className={`activity-amount ${transaction.amount > 0 ? 'positive' : 'negative'}`}>
-                      {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <div className="package-benefits">
-            <h3>Your {userFeatures.label} Package Benefits</h3>
-            <div className="benefits-list">
-              {userFeatures.features.map((feature, index) => (
-                <div key={index} className="benefit-item">
-                  <i className="fas fa-check"></i>
-                  <span>{feature}</span>
+      {/* Recent Activity */}
+      <div className="recent-activity">
+        <h3>Recent Activity</h3>
+        {(!recent_transactions || recent_transactions.length === 0) ? (
+          <p className="no-activity">No recent activity</p>
+        ) : (
+          <div className="activity-list">
+            {recent_transactions.slice(0, 5).map(transaction => (
+              <div key={transaction.id} className="activity-item">
+                <div className="activity-icon">
+                  <i className={`fas ${getTransactionIcon(transaction.transaction_type)}`}></i>
                 </div>
-              ))}
-            </div>
+                <div className="activity-details">
+                  <p>{transaction.description}</p>
+                  <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                </div>
+                <div className={`activity-amount ${transaction.amount > 0 ? 'positive' : 'negative'}`}>
+                  {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                </div>
+              </div>
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* Package Benefits */}
+      <div className="package-benefits">
+        <h3>Your {userFeatures.label} Package Benefits</h3>
+        <div className="benefits-list">
+          {userFeatures.features.map((feature, index) => (
+            <div key={index} className="benefit-item">
+              <i className="fas fa-check"></i>
+              <span>{feature}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
