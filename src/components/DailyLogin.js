@@ -1,302 +1,361 @@
 import React, { useState, useEffect } from 'react';
-import { gamesAPI, profileAPI } from '../services/apiService';
+import { Link, useNavigate } from 'react-router-dom';
+import { dashboardAPI } from '../services/apiService';
 import { authAPI } from '../services/authService';
-import '../styles/DailyLogin.css';
+import { 
+  getPackageFeatures, 
+  formatCurrency, 
+  getUserPackageTier,
+  NAIRA_SIGN
+} from '../utils/packageFeatures';
+import PackageBadge from './PackageBadge';
+import '../styles/Dashboard.css';
 
-const DailyLogin = ({ user }) => {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+const Dashboard = ({ user }) => {
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [loginHistory, setLoginHistory] = useState([]);
-  const [streakCount, setStreakCount] = useState(0);
-  const [canClaim, setCanClaim] = useState(true);
-  const [userProfile, setUserProfile] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchUserProfile();
-    fetchLoginHistory();
+    fetchDashboardData();
   }, []);
 
-  const fetchUserProfile = async () => {
-    try {
-      const profile = await profileAPI.getProfile();
-      setUserProfile(profile);
-      checkDailyClaim(profile);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
-  };
-
-  const fetchLoginHistory = async () => {
-    try {
-      const history = await gamesAPI.getGameHistory();
-      const loginHistory = history.filter(game => game.game_type === 'daily_login');
-      setLoginHistory(loginHistory.slice(0, 7)); // Last 7 days
-      
-      calculateStreak(loginHistory);
-    } catch (error) {
-      console.error('Error fetching login history:', error);
-      // Don't show error to user for history fetch
-    }
-  };
-
-  const checkDailyClaim = (profile) => {
-    if (!profile) return;
-    
-    // Check if user already claimed today based on last_daily_login
-    const today = new Date().toDateString();
-    const lastLogin = profile.last_daily_login ? new Date(profile.last_daily_login).toDateString() : null;
-    
-    setCanClaim(lastLogin !== today);
-  };
-
-  const calculateStreak = (history) => {
-    if (!history || history.length === 0) {
-      setStreakCount(0);
-      return;
-    }
-
-    // Sort by date descending
-    const sortedHistory = [...history].sort((a, b) => 
-      new Date(b.participation_date) - new Date(a.participation_date)
-    );
-
-    let streak = 0;
-    let currentDate = new Date();
-    
-    // Check consecutive days from today backwards
-    for (let i = 0; i < sortedHistory.length; i++) {
-      const loginDate = new Date(sortedHistory[i].participation_date);
-      const expectedDate = new Date(currentDate);
-      
-      // Reset time parts for date comparison
-      loginDate.setHours(0, 0, 0, 0);
-      expectedDate.setHours(0, 0, 0, 0);
-      
-      if (loginDate.getTime() === expectedDate.getTime()) {
-        streak++;
-        currentDate.setDate(currentDate.getDate() - 1); // Move to previous day
-      } else {
-        break;
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDashboardData();
       }
-    }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    setStreakCount(streak);
-  };
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
-  const claimDailyLogin = async () => {
-    if (!canClaim) {
-      setError('You have already claimed your daily bonus today.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setResult(null);
-
+  const fetchDashboardData = async () => {
     try {
-      const response = await gamesAPI.claimDailyLogin();
-      setResult(response);
-      setCanClaim(false);
+      setLoading(true);
+      setError('');
       
-      // Refresh user profile to get updated data
-      await fetchUserProfile();
-      
-      // Refresh history after successful claim
-      await fetchLoginHistory();
-      
-      // Show success message for longer
-      setTimeout(() => {
-        setResult(null);
-      }, 8000);
+      console.log('📊 Fetching dashboard data...');
+      const data = await dashboardAPI.getDashboardData();
+      console.log('📊 Dashboard data received:', data);
+      setDashboardData(data);
       
     } catch (error) {
-      console.error('Error claiming daily login:', error);
-      if (error.message.includes('already claimed')) {
-        setCanClaim(false);
-        await fetchUserProfile(); // Refresh to get current status
+      console.error('❌ Error fetching dashboard data:', error);
+      
+      // Handle authentication errors
+      if (error.message.includes('Authentication failed') || 
+          error.message.includes('Invalid token') ||
+          error.message.includes('401') ||
+          error.message.includes('403')) {
+        
+        console.log('🔐 Authentication error detected, redirecting to login...');
+        authAPI.clearAuth();
+        navigate('/login');
+        return;
       }
-      setError(error.message || 'Failed to claim daily login bonus. Please try again.');
+      
+      setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getBonusAmount = () => {
-    const packageType = user?.package?.type || user?.package_tier || 'silver';
-    
-    const bonusAmounts = {
-      pro: 1000,
-      silver: 700
-      // Removed basic package as requested
+  // Calculate platform-specific earnings from submissions
+  const calculatePlatformEarnings = (submissions = []) => {
+    const platformEarnings = {
+      tiktok: 0,
+      instagram: 0,
+      facebook: 0
     };
-    
-    return bonusAmounts[packageType] || bonusAmounts.silver;
+
+    if (!submissions || !Array.isArray(submissions)) return platformEarnings;
+
+    submissions.forEach(submission => {
+      if ((submission.status === 'approved' || submission.status === 'paid') && submission.earnings) {
+        const platform = submission.platform?.toLowerCase();
+        if (platform in platformEarnings) {
+          platformEarnings[platform] += parseFloat(submission.earnings) || 0;
+        }
+      }
+    });
+
+    console.log('📱 Platform earnings calculated:', platformEarnings);
+    return platformEarnings;
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+  // Calculate total balance from all sources - use total_earnings from backend
+  const calculateTotalBalance = (data) => {
+    if (!data) return 0;
     
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric' 
-      });
+    // Use total_earnings from backend as the main balance
+    const totalBalance = data.total_earnings || data.total_balance || 0;
+    
+    console.log('💰 Total Balance:', {
+      totalEarnings: data.total_earnings,
+      totalBalance: data.total_balance,
+      finalTotalBalance: totalBalance
+    });
+    
+    return totalBalance;
+  };
+
+  const handleRetry = () => {
+    fetchDashboardData();
+  };
+
+  const handleLogout = () => {
+    authAPI.logout();
+    navigate('/login');
+  };
+
+  if (loading) {
+    return (
+      <div className="dashboard-loading">
+        <div className="loading-spinner"></div>
+        <p>Loading your dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error && !dashboardData) {
+    return (
+      <div className="dashboard-error">
+        <div className="error-icon">
+          <i className="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>Unable to Load Dashboard</h3>
+        <p>{error}</p>
+        <div className="error-actions">
+          <button onClick={handleRetry} className="retry-button">
+            <i className="fas fa-redo"></i> Try Again
+          </button>
+          <button onClick={handleLogout} className="logout-button">
+            <i className="fas fa-sign-out-alt"></i> Logout
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Use safe fallback data if dashboardData is null
+  const safeData = dashboardData || {
+    wallet_balance: user?.wallet_balance || 0,
+    total_earnings: user?.total_earnings || 0,
+    package: user?.package || null,
+    recent_transactions: [],
+    recent_submissions: [],
+    referral_stats: { total_referrals: 0, total_earned: 0 },
+    earnings_breakdown: {
+      content: 0,
+      referrals: 0,
+      games: 0,
+      daily_login: 0
     }
   };
 
-  const getCurrentPackageName = () => {
-    const packageType = user?.package?.type || user?.package_tier;
-    
-    const packageNames = {
-      pro: 'Pro Package',
-      silver: 'Silver Package'
-    };
-    
-    return packageNames[packageType] || 'Silver Package';
+  const packageTier = getUserPackageTier(user);
+  const userFeatures = getPackageFeatures(packageTier);
+  const { recent_transactions, referral_stats, earnings_breakdown, recent_submissions } = safeData;
+  
+  // Calculate platform-specific earnings
+  const platformEarnings = calculatePlatformEarnings(recent_submissions);
+  
+  // Calculate total balance from all sources
+  const totalBalance = calculateTotalBalance(safeData);
+  
+  // Create stats object with calculated values
+  const stats = {
+    totalEarnings: totalBalance,
+    tiktokEarnings: platformEarnings.tiktok,
+    instagramEarnings: platformEarnings.instagram,
+    facebookEarnings: platformEarnings.facebook,
+    totalReferrals: referral_stats?.total_referrals || 0,
+    referralEarnings: referral_stats?.total_earned || 0,
+    gameEarnings: earnings_breakdown?.games || 0,
+    dailyLoginEarnings: earnings_breakdown?.daily_login || 0,
+    contentEarnings: earnings_breakdown?.content || 0
   };
 
   return (
-    <div className="daily-login">
-      <div className="daily-login-header">
-        <div className="header-content">
-          <div className="header-icon">
-            <i className="fas fa-calendar-check"></i>
-          </div>
-          <div className="header-text">
-            <h1>Daily Login Bonus</h1>
-            <p>Claim your daily reward and build your streak!</p>
-          </div>
+    <div className="dashboard">
+      {/* Show error banner if we have an error but still showing data */}
+      {error && dashboardData && (
+        <div className="dashboard-warning">
+          <i className="fas fa-exclamation-circle"></i>
+          <span>Some data may not be up to date. {error}</span>
+          <button onClick={handleRetry} className="retry-small">
+            Retry
+          </button>
         </div>
-        
-        <div className="streak-counter">
-          <div className="streak-number">{streakCount}</div>
-          <div className="streak-label">Day Streak</div>
-          <div className="streak-subtitle">Keep it going! 🔥</div>
+      )}
+
+      {/* Row 1: Welcome and Package Badge - Left Side */}
+      <div className="dashboard-row welcome-row">
+        <div className="user-welcome">
+          <h1>
+            Welcome, {user?.username || 'User'} 
+            <PackageBadge tier={packageTier} />
+          </h1>
+          <p>Package: {userFeatures.label} - Enjoy your exclusive benefits!</p>
         </div>
       </div>
 
-      <div className="daily-login-content">
-        <div className="bonus-card">
-          <div className="bonus-icon">
-            <i className="fas fa-gift"></i>
+      {/* Row 2: Brand & Platform Balances */}
+      <div className="dashboard-row brand-platforms-row">
+        <div className="board">
+          {/* META_SHARK Brand - Center */}
+          <div className="meta-layout">
+            <img src="/logo192.png" alt="META_SHARK" />
+            <span className="brand-text">META_SHARK</span>
           </div>
-          <div className="bonus-info">
-            <h3>Today's Bonus</h3>
-            <div className="bonus-amount-main">
-              <span className="amount">₦{getBonusAmount().toLocaleString()}</span>
-              <span className="package">{getCurrentPackageName()}</span>
+
+          {/* Total Balance */}
+          <div className="main-stat-card">
+            <div className="main-stat-info">
+              <p>Total Balance</p>
+              <h3>{NAIRA_SIGN}{totalBalance.toFixed(2)}</h3>
             </div>
-            <div className="bonus-description">
-              <p>Your daily login bonus based on your current package</p>
-            </div>
+          </div>
+
+          {/* Platform Balances Row */}
+          <div className="platforms-row">
+            <Link to='/tiktok' className='link-properties'>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <i className="fab fa-tiktok"></i>
+                </div>
+                <div className="stat-info">
+                  <h3>{NAIRA_SIGN}{stats.tiktokEarnings.toFixed(2)}</h3>
+                  <p>TikTok Balance {'>'}</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link to='/instagram' className='link-properties'>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <i className="fab fa-instagram"></i>
+                </div>
+                <div className="stat-info">
+                  <h3>{NAIRA_SIGN}{stats.instagramEarnings.toFixed(2)}</h3>
+                  <p>Instagram Balance {'>'}</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link to='/facebook' className='link-properties'>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <i className="fab fa-facebook-f"></i>
+                </div>
+                <div className="stat-info">
+                  <h3>{NAIRA_SIGN}{stats.facebookEarnings.toFixed(2)}</h3>
+                  <p>Facebook Balance {'>'}</p>
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
+      </div>
 
-        {error && (
-          <div className="error-message">
-            <i className="fas fa-exclamation-circle"></i>
-            {error}
+      {/* Row 3: Actions Row */}
+      <div className="dashboard-row actions-row">
+        <div className='act-list'>
+          <Link to='/withdrawal' className='link-properties'>
+            <div className='act-card'>
+              <div className="act-icon">
+                <i className="fas fa-money-bill-wave"></i>
+              </div>
+              <div className="act-info">
+                <h3>Withdrawal</h3>
+                <p>Withdraw your earnings {'>'}</p>
+              </div>
+            </div>
+          </Link>
+          
+          <Link to='/referrals' className='link-properties'>
+            <div className='act-card'>
+              <div className='act-icon'>
+                <i className="fas fa-users"></i>
+              </div>
+              <div className='act-info'>
+                <h3>Referral</h3>
+                <p>{NAIRA_SIGN}{stats.referralEarnings.toFixed(2)} {'>'}</p>
+              </div>
+            </div>
+          </Link> 
+          
+          <Link to="/games" className='link-properties'>
+            <div className='act-card'>
+              <div className='act-icon'>
+                <i className="fas fa-gamepad"></i>
+              </div>
+              <div className='act-info'>
+                <h3>Games</h3>
+                <p>{NAIRA_SIGN}{stats.gameEarnings.toFixed(2)} {'>'}</p>
+                <small>Daily rewards</small>
+              </div>
+            </div>
+          </Link>
+          
+          <Link to="/daily-login" className='link-properties'>
+            <div className='act-card'>
+              <div className='act-icon'>
+                <i className="fas fa-sign-in-alt"></i>
+              </div>
+              <div className='act-info'>
+                <h3>Daily Login</h3>
+                <p>{NAIRA_SIGN}{stats.dailyLoginEarnings.toFixed(2)} {'>'}</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Row 4: Content Row - Recent Activity on top of Package Benefits */}
+      <div className="dashboard-row content-row">
+        <div className="content-stack">
+          {/* Recent Activity - Top */}
+          <div className="recent-activity">
+            <h3>Recent Activity</h3>
+            {(!recent_transactions || recent_transactions.length === 0) ? (
+              <p className="no-activity">No recent activity</p>
+            ) : (
+              <div className="activity-list">
+                {recent_transactions.slice(0, 5).map(transaction => (
+                  <div key={transaction.id} className="activity-item">
+                    <div className="activity-icon">
+                      <i className={`fas ${getTransactionIcon(transaction.transaction_type)}`}></i>
+                    </div>
+                    <div className="activity-details">
+                      <p>{transaction.description}</p>
+                      <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                    </div>
+                    <div className={`activity-amount ${transaction.amount > 0 ? 'positive' : 'negative'}`}>
+                      {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-
-        {result && (
-          <div className="success-message">
-            <div className="success-icon">
-              <i className="fas fa-trophy"></i>
-            </div>
-            <div className="success-content">
-              <h3>Bonus Claimed Successfully! 🎉</h3>
-              <p className="bonus-claimed">₦{result.bonus_amount || result.reward} has been added to your wallet</p>
-              <p className="streak-update">Your streak is now {streakCount + 1} days! 🔥</p>
-              <small>The bonus has been added to your total balance in the dashboard</small>
-            </div>
-          </div>
-        )}
-
-        <button 
-          onClick={claimDailyLogin}
-          disabled={loading || !canClaim}
-          className={`claim-button ${loading ? 'loading' : ''} ${!canClaim ? 'claimed' : ''}`}
-        >
-          {loading ? (
-            <>
-              <i className="fas fa-spinner fa-spin"></i>
-              Claiming Bonus...
-            </>
-          ) : !canClaim ? (
-            <>
-              <i className="fas fa-check"></i>
-              Already Claimed Today
-            </>
-          ) : (
-            <>
-              <i className="fas fa-gift"></i>
-              Claim Daily Bonus
-            </>
-          )}
-        </button>
-
-        <div className="login-history">
-          <h3>Recent Login History</h3>
-          {loginHistory.length === 0 ? (
-            <div className="empty-history">
-              <i className="fas fa-history"></i>
-              <p>No login history yet</p>
-              <small>Claim your first bonus to start your streak!</small>
-            </div>
-          ) : (
-            <div className="history-grid">
-              {loginHistory.map((login, index) => (
-                <div key={login.id} className={`history-item ${index === 0 ? 'latest' : ''}`}>
-                  <div className="history-date">
-                    {formatDate(login.participation_date)}
-                    {index === 0 && <span className="latest-badge">Latest</span>}
-                  </div>
-                  <div className="history-bonus">
-                    +₦{parseFloat(login.reward_earned).toLocaleString()}
-                  </div>
-                  <div className="history-status">
-                    <i className="fas fa-check-circle"></i>
-                    Claimed
-                  </div>
+          
+          {/* Package Benefits - Bottom */}
+          <div className="package-benefits">
+            <h3>Your {userFeatures.label} Package Benefits</h3>
+            <div className="benefits-list">
+              {userFeatures.features.map((feature, index) => (
+                <div key={index} className="benefit-item">
+                  <i className="fas fa-check"></i>
+                  <span>{feature}</span>
                 </div>
               ))}
-            </div>
-          )}
-        </div>
-
-        <div className="login-tips">
-          <h4>💡 Daily Login Tips</h4>
-          <div className="tips-grid">
-            <div className="tip-item">
-              <i className="fas fa-sync-alt"></i>
-              <div>
-                <strong>Consistency Matters</strong>
-                <p>Login every day to maintain your streak and earn bigger rewards</p>
-              </div>
-            </div>
-            <div className="tip-item">
-              <i className="fas fa-box-open"></i>
-              <div>
-                <strong>Upgrade Package</strong>
-                <p>Higher packages get better daily bonuses (Pro: ₦1,000, Silver: ₦700)</p>
-              </div>
-            </div>
-            <div className="tip-item">
-              <i className="fas fa-clock"></i>
-              <div>
-                <strong>24-Hour Reset</strong>
-                <p>Bonus resets at midnight every day. Don't miss a day!</p>
-              </div>
             </div>
           </div>
         </div>
@@ -305,4 +364,15 @@ const DailyLogin = ({ user }) => {
   );
 };
 
-export default DailyLogin;
+const getTransactionIcon = (type) => {
+  switch (type) {
+    case 'content': return 'fa-video';
+    case 'referral': return 'fa-users';
+    case 'game': return 'fa-gamepad';
+    case 'daily_login': return 'fa-sign-in-alt';
+    case 'payout': return 'fa-money-bill-wave';
+    default: return 'fa-circle';
+  }
+};
+
+export default Dashboard;

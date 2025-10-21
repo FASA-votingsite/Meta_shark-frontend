@@ -1,22 +1,20 @@
 import { API_BASE_URL } from '../config/environment';
 
 // Helper function for API calls
+// In your authService.js, update the apiRequest function
+// Update your apiRequest function in authService.js
 const apiRequest = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('metashark_token');
+  const token = authAPI.getToken();
+  
   const defaultHeaders = {
     'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...options.headers
   };
 
-  if (token) {
-    defaultHeaders['Authorization'] = `Token ${token}`;
-  }
-
   const config = {
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
     ...options,
+    headers: defaultHeaders
   };
 
   // Stringify body if it's an object
@@ -25,35 +23,77 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 
   try {
+    console.log(`🌐 Making API request to: ${endpoint}`, config);
+    
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    
+    console.log(`📨 Response status: ${response.status}`, response);
+    
+    // Handle unauthorized/forbidden
+    if (response.status === 401 || response.status === 403) {
+      console.log('🔐 Authentication failed, clearing token...');
+      authAPI.logout();
+      throw new Error('Authentication failed. Please login again.');
+    }
     
     if (!response.ok) {
       let errorMessage = `HTTP error! status: ${response.status}`;
+      let responseText = '';
+      
       try {
-        const errorData = await response.json();
-        console.log('Error response:', errorData);
-        errorMessage = errorData.detail || errorData.message || errorMessage;
+        // First, try to get the response as text to see what's actually being returned
+        responseText = await response.text();
+        console.log('📝 Raw response text:', responseText);
         
-        // Handle specific error cases
-        if (errorData.username) errorMessage = errorData.username[0];
-        if (errorData.password) errorMessage = errorData.password[0];
-        if (errorData.non_field_errors) errorMessage = errorData.non_field_errors[0];
-        if (typeof errorData === 'object') {
+        // Try to parse as JSON if it looks like JSON
+        if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.detail || errorData.message || errorData.error || errorMessage;
+          
           // Handle field-specific errors
-          const fieldErrors = Object.values(errorData).flat();
-          if (fieldErrors.length > 0) {
-            errorMessage = fieldErrors[0];
+          if (errorData.username) errorMessage = errorData.username[0];
+          if (errorData.password) errorMessage = errorData.password[0];
+          if (errorData.non_field_errors) errorMessage = errorData.non_field_errors[0];
+          if (typeof errorData === 'object') {
+            const fieldErrors = Object.values(errorData).flat();
+            if (fieldErrors.length > 0) {
+              errorMessage = fieldErrors[0];
+            }
           }
+        } else {
+          // It's not JSON, use the raw text
+          errorMessage = responseText || errorMessage;
         }
       } catch (parseError) {
-        // If response is not JSON, use status text
-        errorMessage = response.statusText || errorMessage;
+        console.error('❌ JSON parse error:', parseError);
+        // Use the raw text if JSON parsing fails
+        errorMessage = responseText || response.statusText || errorMessage;
       }
       
       throw new Error(errorMessage);
     }
-
-    return await response.json();
+    
+    // Handle empty responses
+    const contentLength = response.headers.get('content-length');
+    if (contentLength === '0' || response.status === 204) {
+      return null;
+    }
+    
+    // For successful responses, try to parse as JSON
+    const responseText = await response.text();
+    console.log('✅ Successful response text:', responseText);
+    
+    if (!responseText) {
+      return null;
+    }
+    
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error for successful response:', parseError);
+      throw new Error('Invalid response format from server');
+    }
+    
   } catch (error) {
     console.error('API request failed:', {
       endpoint,

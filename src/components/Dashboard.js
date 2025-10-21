@@ -89,34 +89,17 @@ const Dashboard = ({ user }) => {
     return platformEarnings;
   };
 
-  // Calculate total balance from all sources
+  // Calculate total balance from all sources - use total_earnings from backend
   const calculateTotalBalance = (data) => {
     if (!data) return 0;
     
-    const { earnings_breakdown = {}, referral_stats = {}, recent_submissions = [] } = data;
+    // Use total_earnings from backend as the main balance
+    const totalBalance = data.total_earnings || data.total_balance || 0;
     
-    // Use backend-calculated earnings breakdown as primary source
-    const contentEarnings = earnings_breakdown.content || 0;
-    const referralEarnings = referral_stats.total_earned || 0;
-    const gameEarnings = earnings_breakdown.games || 0;
-    const dailyLoginEarnings = earnings_breakdown.daily_login || 0;
-    
-    // Fallback: Calculate platform earnings from submissions if breakdown is missing
-    let calculatedContentEarnings = contentEarnings;
-    if (!contentEarnings && recent_submissions.length > 0) {
-      const platformEarnings = calculatePlatformEarnings(recent_submissions);
-      calculatedContentEarnings = platformEarnings.tiktok + platformEarnings.instagram + platformEarnings.facebook;
-    }
-    
-    // Total balance is sum of all earnings sources
-    const totalBalance = calculatedContentEarnings + referralEarnings + gameEarnings + dailyLoginEarnings;
-    
-    console.log('💰 Earnings Breakdown:', {
-      contentEarnings: calculatedContentEarnings,
-      referralEarnings,
-      gameEarnings,
-      dailyLoginEarnings,
-      totalBalance
+    console.log('💰 Total Balance:', {
+      totalEarnings: data.total_earnings,
+      totalBalance: data.total_balance,
+      finalTotalBalance: totalBalance
     });
     
     return totalBalance;
@@ -199,14 +182,6 @@ const Dashboard = ({ user }) => {
     contentEarnings: earnings_breakdown?.content || 0
   };
 
-  // Count approved/paid videos per platform
-  const getPlatformVideoCount = (platform) => {
-    if (!recent_submissions) return 0;
-    return recent_submissions.filter(
-      sub => sub.platform === platform && (sub.status === 'approved' || sub.status === 'paid')
-    ).length;
-  };
-
   return (
     <div className="dashboard">
       {/* Show error banner if we have an error but still showing data */}
@@ -220,7 +195,8 @@ const Dashboard = ({ user }) => {
         </div>
       )}
 
-      <div className="dashboard-header">
+      {/* Row 1: Welcome and Package Badge - Left Side */}
+      <div className="dashboard-row welcome-row">
         <div className="user-welcome">
           <h1>
             Welcome, {user?.username || 'User'} 
@@ -230,141 +206,156 @@ const Dashboard = ({ user }) => {
         </div>
       </div>
 
-      <div className='board'>
-        <div className='meta-layout'>
-          <img src="/logo192.png" alt="META_SHARK" />
-          <span>META_SHARK</span>
-        </div>
+      {/* Row 2: META_SHARK Brand with Platform Balances */}
+      <div className="dashboard-row brand-platforms-row">
+        <div className="board">
+          {/* META_SHARK Brand - Center */}
+          <div className="meta-layout">
+            <img src="/logo192.png" alt="META_SHARK" />
+            <span className="brand-text">META_SHARK</span>
+          </div>
 
-        <div className="main-stat-card">
-          <div className="main-stat-info">
-            <p>Total Balance</p>
-            <h3>{NAIRA_SIGN}{totalBalance.toFixed(2)}</h3>
+          {/* Total Balance */}
+          <div className="main-stat-card">
+            <div className="main-stat-info">
+              <p>Total Balance</p>
+              <h3>{NAIRA_SIGN}{totalBalance.toFixed(2)}</h3>
+            </div>
+          </div>
+
+          {/* Platform Balances Row */}
+          <div className="platforms-row">
+            <Link to='/tiktok' className='link-properties'>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <i className="fab fa-tiktok"></i>
+                </div>
+                <div className="stat-info">
+                  <h3>{NAIRA_SIGN}{stats.tiktokEarnings.toFixed(2)}</h3>
+                  <p>TikTok Balance {'>'}</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link to='/instagram' className='link-properties'>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <i className="fab fa-instagram"></i>
+                </div>
+                <div className="stat-info">
+                  <h3>{NAIRA_SIGN}{stats.instagramEarnings.toFixed(2)}</h3>
+                  <p>Instagram Balance {'>'}</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link to='/facebook' className='link-properties'>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <i className="fab fa-facebook-f"></i>
+                </div>
+                <div className="stat-info">
+                  <h3>{NAIRA_SIGN}{stats.facebookEarnings.toFixed(2)}</h3>
+                  <p>Facebook Balance {'>'}</p>
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
+      </div>
 
-        <div className="stats-grid">
-          <Link to='/tiktok' className='link-properties'>
-            <div className="stat-card">
-              <div className="stat-icon">
-                <i className="fab fa-tiktok"></i>
+      {/* Row 3: Actions Row */}
+      <div className="dashboard-row actions-row">
+        <div className='act-list'>
+          <Link to='/withdrawal' className='link-properties'>
+            <div className='act-card'>
+              <div className="act-icon">
+                <i className="fas fa-money-bill-wave"></i>
               </div>
-              <div className="stat-info">
-                <h3>{NAIRA_SIGN}{stats.tiktokEarnings.toFixed(2)}</h3>
-                <p>TikTok Balance {'>'}</p>
+              <div className="act-info">
+                <h3>Withdrawal</h3>
+                <p>Withdraw your earnings {'>'}</p>
               </div>
             </div>
           </Link>
-
-          <Link to='/instagram' className='link-properties'>
-            <div className="stat-card">
-              <div className="stat-icon">
-                <i className="fab fa-instagram"></i>
+          
+          <Link to='/referrals' className='link-properties'>
+            <div className='act-card'>
+              <div className='act-icon'>
+                <i className="fas fa-users"></i>
               </div>
-              <div className="stat-info">
-                <h3>{NAIRA_SIGN}{stats.instagramEarnings.toFixed(2)}</h3>
-                <p>Instagram Balance {'>'}</p>
+              <div className='act-info'>
+                <h3>Referral</h3>
+                <p>{NAIRA_SIGN}{stats.referralEarnings.toFixed(2)} {'>'}</p>
+              </div>
+            </div>
+          </Link> 
+          
+          <Link to="/games" className='link-properties'>
+            <div className='act-card'>
+              <div className='act-icon'>
+                <i className="fas fa-gamepad"></i>
+              </div>
+              <div className='act-info'>
+                <h3>Games</h3>
+                <p>{NAIRA_SIGN}{stats.gameEarnings.toFixed(2)} {'>'}</p>
+                <small>Daily rewards</small>
               </div>
             </div>
           </Link>
-
-          <Link to='/facebook' className='link-properties'>
-            <div className="stat-card">
-              <div className="stat-icon">
-                <i className="fab fa-facebook-f"></i>
+          
+          <Link to="/daily-login" className='link-properties'>
+            <div className='act-card'>
+              <div className='act-icon'>
+                <i className="fas fa-sign-in-alt"></i>
               </div>
-              <div className="stat-info">
-                <h3>{NAIRA_SIGN}{stats.facebookEarnings.toFixed(2)}</h3>
-                <p>FaceBook Balance {'>'}</p>
+              <div className='act-info'>
+                <h3>Daily Login</h3>
+                <p>{NAIRA_SIGN}{stats.dailyLoginEarnings.toFixed(2)} {'>'}</p>
               </div>
             </div>
           </Link>
         </div>
       </div>
 
-      <div className='act-list'>
-        <Link to='/withdrawal' className='link-properties'>
-          <div className='act-card'>
-            <div className="act-icon">
-              <i className="fas fa-money-bill-wave"></i>
-            </div>
-            <h3>Withdrawal</h3>
-          </div>
-        </Link>
-        
-        <Link to='/referrals' className='link-properties'>
-          <div className='act-card'>
-            <div className='act-icon'>
-              <i className="fas fa-users"></i>
-            </div>
-            <div className='act-info'>
-              <h3>Referral</h3>
-              <p>{NAIRA_SIGN}{stats.referralEarnings.toFixed(2)} {'>'}</p>
-            </div>
-          </div>
-        </Link> 
-        
-        <Link to="/games" className='link-properties'>
-          <div className='act-card'>
-            <div className='act-icon'>
-              <i className="fas fa-gamepad"></i>
-            </div>
-            <div className='act-info'>
-              <h3>Games</h3>
-              <p>{NAIRA_SIGN}{stats.gameEarnings.toFixed(2)} {'>'}</p>
-              <small>Daily rewards</small>
-            </div>
-          </div>
-        </Link>
-        
-        <Link to="/daily-login" className='link-properties'>
-          <div className='act-card'>
-            <div className='act-icon'>
-              <i className="fas fa-sign-in-alt"></i>
-            </div>
-            <div className='act-info'>
-              <h3>Daily Login</h3>
-              <p>{NAIRA_SIGN}{stats.dailyLoginEarnings.toFixed(2)} {'>'}</p>
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      <div className="dashboard-grid">
-        <div className="recent-activity">
-          <h3>Recent Activity</h3>
-          {(!recent_transactions || recent_transactions.length === 0) ? (
-            <p className="no-activity">No recent activity</p>
-          ) : (
-            <div className="activity-list">
-              {recent_transactions.slice(0, 5).map(transaction => (
-                <div key={transaction.id} className="activity-item">
-                  <div className="activity-icon">
-                    <i className={`fas ${getTransactionIcon(transaction.transaction_type)}`}></i>
+      {/* Row 4: Content Row */}
+      <div className="dashboard-row content-row">
+        <div className="dashboard-grid">
+          <div className="recent-activity">
+            <h3>Recent Activity</h3>
+            {(!recent_transactions || recent_transactions.length === 0) ? (
+              <p className="no-activity">No recent activity</p>
+            ) : (
+              <div className="activity-list">
+                {recent_transactions.slice(0, 5).map(transaction => (
+                  <div key={transaction.id} className="activity-item">
+                    <div className="activity-icon">
+                      <i className={`fas ${getTransactionIcon(transaction.transaction_type)}`}></i>
+                    </div>
+                    <div className="activity-details">
+                      <p>{transaction.description}</p>
+                      <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                    </div>
+                    <div className={`activity-amount ${transaction.amount > 0 ? 'positive' : 'negative'}`}>
+                      {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                    </div>
                   </div>
-                  <div className="activity-details">
-                    <p>{transaction.description}</p>
-                    <span>{new Date(transaction.date).toLocaleDateString()}</span>
-                  </div>
-                  <div className={`activity-amount ${transaction.amount > 0 ? 'positive' : 'negative'}`}>
-                    {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
-                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="package-benefits">
+            <h3>Your {userFeatures.label} Package Benefits</h3>
+            <div className="benefits-list">
+              {userFeatures.features.map((feature, index) => (
+                <div key={index} className="benefit-item">
+                  <i className="fas fa-check"></i>
+                  <span>{feature}</span>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="package-benefits">
-        <h3>Your {userFeatures.label} Package Benefits</h3>
-        <div className="benefits-list">
-          {userFeatures.features.map((feature, index) => (
-            <div key={index} className="benefit-item">
-              <i className="fas fa-check"></i>
-              <span>{feature}</span>
-            </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>

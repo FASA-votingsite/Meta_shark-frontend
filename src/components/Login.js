@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { authAPI } from '../services/authService';
 import '../styles/Auth.css';
 
@@ -7,8 +8,8 @@ const Login = ({ onLogin }) => {
     username: '',
     password: ''
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -22,11 +23,88 @@ const Login = ({ onLogin }) => {
     setLoading(true);
     setError('');
 
+    // Basic validation
+    if (!formData.username.trim() || !formData.password.trim()) {
+      setError('Please enter both username and password');
+      setLoading(false);
+      return;
+    }
+
     try {
+      console.log('🔐 Sending login data:', { 
+        username: formData.username, 
+        password: '***' // Don't log actual password
+      });
+      
       const response = await authAPI.login(formData.username, formData.password);
-      onLogin(response.token, response.user);
+      console.log('✅ Login response:', response);
+      
+      if (response.token && response.user) {
+        onLogin(response);
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
-      setError(error.message || 'Login failed. Please check your credentials and try again.');
+      console.error('❌ Login error:', error);
+      setError(error.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Debug login function (temporary)
+  const debugLogin = async (username, password) => {
+    try {
+      console.log('🔐 Debug: Attempting login...');
+      
+      const response = await fetch('https://meta-shark-backend.onrender.com/api/auth/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username,
+          password: password
+        })
+      });
+      
+      console.log('🔐 Debug: Response status:', response.status);
+      
+      const responseText = await response.text();
+      console.log('🔐 Debug: Raw response:', responseText);
+      
+      if (!response.ok) {
+        throw new Error(`Login failed: ${response.status} - ${responseText}`);
+      }
+      
+      try {
+        const data = JSON.parse(responseText);
+        return data;
+      } catch (parseError) {
+        console.error('🔐 Debug: JSON parse error:', parseError);
+        throw new Error('Server returned invalid JSON');
+      }
+    } catch (error) {
+      console.error('🔐 Debug: Login error:', error);
+      throw error;
+    }
+  };
+
+  const handleDebugSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await debugLogin(formData.username, formData.password);
+      
+      if (response.token && response.user) {
+        onLogin(response);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      setError(error.message);
     } finally {
       setLoading(false);
     }

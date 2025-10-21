@@ -1,54 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { walletAPI } from '../services/apiService';
-import { getPackageFeatures } from '../utils/packageFeatures';
+import { getPackageFeatures, getUserPackageTier } from '../utils/packageFeatures';
 import '../styles/Withdrawal.css';
 
 const Withdrawal = ({ user }) => {
   const [transactions, setTransactions] = useState([]);
-  const [balance, setBalance] = useState(0);
+  const [totalBalance, setTotalBalance] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [formData, setFormData] = useState({
-    bankName: '',
-    accountNumber: '',
-    accountName: '',
-    userPassword: '',
-    amount: ''
+    amount: '',
+    bank_name: '',
+    account_number: '',
+    account_name: '',
+    password: ''  // Make sure this field exists
   });
   const [loading, setLoading] = useState(true);
   const [withdrawalLoading, setWithdrawalLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Nigerian banks list for suggestions
+  // Nigerian banks list
   const nigerianBanks = [
-    "Access Bank",
-    "Zenith Bank",
-    "First Bank of Nigeria",
-    "Guaranty Trust Bank",
-    "United Bank for Africa",
-    "Ecobank Nigeria",
-    "Union Bank of Nigeria",
-    "Stanbic IBTC Bank",
-    "First City Monument Bank",
-    "Sterling Bank",
-    "Wema Bank",
-    "Unity Bank",
-    "Heritage Bank",
-    "Keystone Bank",
-    "Polaris Bank",
-    "Jaiz Bank",
-    "Standard Chartered Bank",
-    "Citibank Nigeria",
-    "Suntrust Bank",
-    "Providus Bank",
-    "Titan Trust Bank",
-    "Globus Bank",
-    "Parallex Bank",
-    "PremiumTrust Bank",
-    "Fidelity Bank",
-    "Kuda Bank",
-    "Moniepoint Microfinance Bank",
-    "Opay",
-    "Palmpay"
+    "Access Bank", "Zenith Bank", "First Bank of Nigeria", "Guaranty Trust Bank",
+    "United Bank for Africa", "Ecobank Nigeria", "Union Bank of Nigeria",
+    "Stanbic IBTC Bank", "First City Monument Bank", "Sterling Bank",
+    "Wema Bank", "Unity Bank", "Heritage Bank", "Keystone Bank", "Polaris Bank",
+    "Jaiz Bank", "Standard Chartered Bank", "Citibank Nigeria", "Suntrust Bank",
+    "Providus Bank", "Titan Trust Bank", "Globus Bank", "Parallex Bank",
+    "PremiumTrust Bank", "Fidelity Bank", "Kuda Bank", "Moniepoint Microfinance Bank",
+    "Opay", "Palmpay"
   ];
 
   useEffect(() => {
@@ -59,13 +39,15 @@ const Withdrawal = ({ user }) => {
     try {
       const [balanceData, transactionsData] = await Promise.all([
         walletAPI.getBalance(),
-        walletAPI.getTransactions()
+        walletAPI.getWithdrawalHistory ? walletAPI.getWithdrawalHistory() : Promise.resolve([])
       ]);
       
-      setBalance(balanceData.balance);
-      setTransactions(transactionsData);
+      setTotalBalance(balanceData.total_earnings || balanceData.total_balance || 0);
+      setWalletBalance(balanceData.wallet_balance || balanceData.balance || 0);
+      setTransactions(transactionsData || []);
     } catch (error) {
       console.error('Error fetching withdrawal data:', error);
+      setError('Failed to load withdrawal data');
     } finally {
       setLoading(false);
     }
@@ -85,37 +67,84 @@ const Withdrawal = ({ user }) => {
     setSuccess('');
 
     // Validation
-    if (parseFloat(formData.amount) > balance) {
-      setError('Amount exceeds your balance');
+    const amount = parseFloat(formData.amount);
+    if (!amount || amount <= 0) {
+      setError('Please enter a valid amount');
       setWithdrawalLoading(false);
       return;
     }
 
-    if (parseFloat(formData.amount) < 1000) {
+    if (amount > walletBalance) {
+      setError(`Amount exceeds your available balance of ₦${walletBalance.toLocaleString()}`);
+      setWithdrawalLoading(false);
+      return;
+    }
+
+    if (amount < 1000) {
       setError('Minimum withdrawal: ₦1,000');
       setWithdrawalLoading(false);
       return;
     }
 
-    if (formData.accountNumber.length < 10) {
-      setError('Please enter a valid account number');
+    if (!formData.account_number || formData.account_number.length < 10) {
+      setError('Please enter a valid 10-digit account number');
+      setWithdrawalLoading(false);
+      return;
+    }
+
+    if (!formData.bank_name) {
+      setError('Please select a bank');
+      setWithdrawalLoading(false);
+      return;
+    }
+
+    if (!formData.account_name) {
+      setError('Please enter account name');
+      setWithdrawalLoading(false);
+      return;
+    }
+
+    if (!formData.password) {
+      setError('Please enter your password to confirm withdrawal');
       setWithdrawalLoading(false);
       return;
     }
 
     try {
-      await walletAPI.requestWithdrawal(formData);
-      setSuccess(`Withdrawal request of ₦${parseFloat(formData.amount).toLocaleString()} submitted successfully! It will be processed within 24-48 hours.`);
+      const withdrawalData = {
+        amount: amount,
+        bank_name: formData.bank_name,
+        account_number: formData.account_number,
+        account_name: formData.account_name,
+        password: formData.password  // Include password
+      };
+
+      console.log('Sending withdrawal data:', withdrawalData);
+      
+      const response = await walletAPI.requestWithdrawal(withdrawalData);
+      setSuccess(`Withdrawal request of ₦${amount.toLocaleString()} submitted successfully! It will be processed within 24-48 hours.`);
+      
+      // Reset form
       setFormData({
-        bankName: '',
-        accountNumber: '',
-        accountName: '',
-        userPassword: '',
-        amount: ''
+        amount: '',
+        bank_name: '',
+        account_number: '',
+        account_name: '',
+        password: ''
       });
-      fetchWithdrawalData(); // Refresh data
+      
+      // Refresh data
+      await fetchWithdrawalData();
     } catch (error) {
-      setError(error.message || 'Withdrawal request failed. Please try again.');
+      console.error('Withdrawal error:', error);
+      // More specific error handling
+      if (error.message.includes('Invalid password')) {
+        setError('Invalid password. Please check your password and try again.');
+      } else if (error.message.includes('Insufficient balance')) {
+        setError('Insufficient balance for this withdrawal.');
+      } else {
+        setError(error.message || 'Withdrawal request failed. Please try again.');
+      }
     } finally {
       setWithdrawalLoading(false);
     }
@@ -129,10 +158,15 @@ const Withdrawal = ({ user }) => {
     }).format(amount);
   };
 
-  const userFeatures = getPackageFeatures(user.package_tier);
+  const userFeatures = getPackageFeatures(user?.package_tier || 'silver');
 
   if (loading) {
-    return <div className="withdrawal-loading">Loading withdrawal data...</div>;
+    return (
+      <div className="withdrawal-loading">
+        <div className="loading-spinner"></div>
+        <p>Loading withdrawal data...</p>
+      </div>
+    );
   }
 
   return (
@@ -145,31 +179,41 @@ const Withdrawal = ({ user }) => {
           <span>
             {userFeatures.withdrawalSpeed === 'fast' 
               ? 'Pro Priority: Withdrawals processed within 1-2 hours' 
-              : 'Standard Processing: Withdrawals processed within 24-48 hours'
+              : 'Standard Processing: Withdrawals processed within 12-24 hours'
             }
           </span>
         </div>
       </div>
 
       <div className="balance-section">
-        <h2>Current Balance</h2>
-        <div className="balance-amount">{formatCurrency(balance)}</div>
-        <p>Available for withdrawal</p>
+        <h2>Total Balance</h2>
+        <div className="balance-amount">{formatCurrency(totalBalance)}</div>
+        <p>Available for Withdrawal</p>
       </div>
 
       <div className="withdrawal-form-section">
         <h2>Request Withdrawal</h2>
         <form onSubmit={handleSubmit} className="withdrawal-form">
-          {error && <div className="withdrawal-error">{error}</div>}
-          {success && <div className="withdrawal-success">{success}</div>}
+          {error && (
+            <div className="withdrawal-error">
+              <i className="fas fa-exclamation-circle"></i>
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="withdrawal-success">
+              <i className="fas fa-check-circle"></i>
+              {success}
+            </div>
+          )}
           
           <div className="form-row">
             <div className="form-group">
               <label>Bank Name *</label>
               <input
                 list="bankOptions"
-                name="bankName"
-                value={formData.bankName}
+                name="bank_name"
+                value={formData.bank_name}
                 onChange={handleChange}
                 placeholder="Select or type your bank name"
                 required
@@ -179,18 +223,18 @@ const Withdrawal = ({ user }) => {
                   <option key={index} value={bank} />
                 ))}
               </datalist>
-              <small>Select from the list or type your bank name</small>
             </div>
 
             <div className="form-group">
               <label>Account Number *</label>
               <input
                 type="text"
-                name="accountNumber"
-                value={formData.accountNumber}
+                name="account_number"
+                value={formData.account_number}
                 onChange={handleChange}
                 placeholder="Enter 10-digit account number"
                 maxLength="10"
+                pattern="[0-9]{10}"
                 required
               />
             </div>
@@ -201,8 +245,8 @@ const Withdrawal = ({ user }) => {
               <label>Account Name *</label>
               <input
                 type="text"
-                name="accountName"
-                value={formData.accountName}
+                name="account_name"
+                value={formData.account_name}
                 onChange={handleChange}
                 placeholder="Name as it appears on your bank account"
                 required
@@ -218,9 +262,11 @@ const Withdrawal = ({ user }) => {
                 onChange={handleChange}
                 placeholder="Enter amount in Naira"
                 min="1000"
-                max={balance}
+                max={totalBalance}
+                step="100"
                 required
               />
+              <small>Available: ₦{formatCurrency(totalBalance)}</small>
             </div>
           </div>
 
@@ -228,12 +274,13 @@ const Withdrawal = ({ user }) => {
             <label>Your Password *</label>
             <input
               type="password"
-              name="userPassword"
-              value={formData.userPassword}
+              name="password"
+              value={formData.password}
               onChange={handleChange}
-              placeholder="Enter your META_SHARK password"
+              placeholder="Enter your password to confirm withdrawal"
               required
             />
+            <small>For security purposes, please enter your password</small>
           </div>
 
           <div className="withdrawal-info">
@@ -243,13 +290,22 @@ const Withdrawal = ({ user }) => {
               <li>Processing time: {userFeatures.withdrawalSpeed === 'fast' ? '1-2 hours' : '24-48 hours'}</li>
               <li>No withdrawal fees</li>
               <li>Ensure your account details are correct</li>
+              <li>Withdrawals are processed on business days</li>
             </ul>
           </div>
 
-          <button type="submit" disabled={withdrawalLoading} className="withdrawal-button">
+          <button 
+            type="submit" 
+            disabled={withdrawalLoading || totalBalance < 1000} 
+            className="withdrawal-button"
+          >
             {withdrawalLoading ? (
               <>
                 <i className="fas fa-spinner fa-spin"></i> Processing...
+              </>
+            ) : totalBalance < 1000 ? (
+              <>
+                <i className="fas fa-exclamation-circle"></i> Minimum ₦1,000 Required
               </>
             ) : (
               <>
@@ -262,18 +318,20 @@ const Withdrawal = ({ user }) => {
 
       <div className="transaction-history">
         <h2>Transaction History</h2>
-        {transactions.length === 0 ? (
+        {!transactions || transactions.length === 0 ? (
           <p className="no-transactions">No transactions yet</p>
         ) : (
           <div className="transaction-list">
-            {transactions.map(transaction => (
+            {transactions.slice(0, 10).map(transaction => (
               <div key={transaction.id} className="transaction-item">
                 <div className="transaction-info">
                   <h4>{transaction.description}</h4>
-                  <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                  <span>
+                    {transaction.date ? new Date(transaction.date).toLocaleDateString() : 'Date unavailable'}
+                  </span>
                 </div>
                 <div className={`transaction-amount ${transaction.amount > 0 ? 'credit' : 'debit'}`}>
-                  {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                  {transaction.amount > 0 ? '-' : ''}{formatCurrency(transaction.amount)}
                 </div>
               </div>
             ))}
