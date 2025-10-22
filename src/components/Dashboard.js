@@ -197,7 +197,7 @@ const Dashboard = ({ user }) => {
 
       {/* Combined Header, Brand, and Platform Cards inside Total Balance Area */}
       <div className="board combined-layout">
-        {/* Header Section */}
+        {/* Header Section - Compact */}
         <div className="combined-header">
           <div className="user-welcome">
             <h1>
@@ -220,7 +220,7 @@ const Dashboard = ({ user }) => {
           </div>
         </div>
 
-        {/* Platform Balances Row */}
+        {/* Platform Balances Row - Simplified Text */}
         <div className="platforms-row">
           <Link to='/tiktok' className='link-properties'>
             <div className="stat-card">
@@ -229,7 +229,7 @@ const Dashboard = ({ user }) => {
               </div>
               <div className="stat-info">
                 <h3>{NAIRA_SIGN}{stats.tiktokEarnings.toFixed(2)}</h3>
-                <p>TikTok Balance {'>'}</p>
+                <p>Balance {'>'}</p>
               </div>
             </div>
           </Link>
@@ -241,7 +241,7 @@ const Dashboard = ({ user }) => {
               </div>
               <div className="stat-info">
                 <h3>{NAIRA_SIGN}{stats.instagramEarnings.toFixed(2)}</h3>
-                <p>Instagram Balance {'>'}</p>
+                <p>Balance {'>'}</p>
               </div>
             </div>
           </Link>
@@ -253,14 +253,14 @@ const Dashboard = ({ user }) => {
               </div>
               <div className="stat-info">
                 <h3>{NAIRA_SIGN}{stats.facebookEarnings.toFixed(2)}</h3>
-                <p>Facebook Balance {'>'}</p>
+                <p>Balance {'>'}</p>
               </div>
             </div>
           </Link>
         </div>
       </div>
 
-      {/* Actions Row */}
+      {/* Actions Row - Simplified to 3 items */}
       <div className="actions-row">
         <div className='act-list'>
           <Link to='/withdrawal' className='link-properties'>
@@ -270,7 +270,7 @@ const Dashboard = ({ user }) => {
               </div>
               <div className="act-info">
                 <h3>Withdrawal</h3>
-                <p>Withdraw your earnings {'>'}</p>
+                {/* Removed "Withdraw your earnings" text */}
               </div>
             </div>
           </Link>
@@ -282,20 +282,7 @@ const Dashboard = ({ user }) => {
               </div>
               <div className='act-info'>
                 <h3>Referral</h3>
-                <p>{NAIRA_SIGN}{stats.referralEarnings.toFixed(2)} {'>'}</p>
-              </div>
-            </div>
-          </Link> 
-          
-          <Link to="/games" className='link-properties'>
-            <div className='act-card'>
-              <div className='act-icon'>
-                <i className="fas fa-gamepad"></i>
-              </div>
-              <div className='act-info'>
-                <h3>Games</h3>
-                <p>{NAIRA_SIGN}{stats.gameEarnings.toFixed(2)} {'>'}</p>
-                <small>Daily rewards</small>
+                <p>{NAIRA_SIGN}{stats.referralEarnings.toFixed(2)}</p>
               </div>
             </div>
           </Link>
@@ -307,7 +294,7 @@ const Dashboard = ({ user }) => {
               </div>
               <div className='act-info'>
                 <h3>Daily Login</h3>
-                <p>{NAIRA_SIGN}{stats.dailyLoginEarnings.toFixed(2)} {'>'}</p>
+                <p>{NAIRA_SIGN}{stats.dailyLoginEarnings.toFixed(2)}</p>
               </div>
             </div>
           </Link>
